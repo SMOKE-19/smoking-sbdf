@@ -43,53 +43,59 @@ android_system_properties 0.1.5
   Upstream: https://github.com/nical/android_system_properties
   License document IDs: dd0815108f8e, af6e2a74133b
 
-arrow-array 56.2.0
-  License expression: Apache-2.0
+arrow-array 59.2.0
+  License expression: Apache-2.0 AND MIT
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
+  License document IDs: bddc4356d6da, 283ea6cc2997, 5018b4040991
 
-arrow-buffer 56.2.0
+arrow-buffer 59.2.0
   License expression: Apache-2.0
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
+  License document IDs: 283ea6cc2997, 5018b4040991
 
-arrow-cast 56.2.0
+arrow-cast 59.2.0
   License expression: Apache-2.0
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
+  License document IDs: 283ea6cc2997, 5018b4040991
 
-arrow-csv 56.2.0
+arrow-csv 59.2.0
   License expression: Apache-2.0
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
+  License document IDs: 283ea6cc2997, 5018b4040991
 
-arrow-data 56.2.0
+arrow-data 59.2.0
   License expression: Apache-2.0
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
+  License document IDs: 283ea6cc2997, 5018b4040991
 
-arrow-ipc 56.2.0
+arrow-ipc 59.2.0
   License expression: Apache-2.0
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
+  License document IDs: 283ea6cc2997, 5018b4040991
 
-arrow-schema 56.2.0
+arrow-ord 59.2.0
   License expression: Apache-2.0
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
+  License document IDs: 283ea6cc2997, 5018b4040991
 
-arrow-select 56.2.0
+arrow-schema 59.2.0
   License expression: Apache-2.0
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
+  License document IDs: 283ea6cc2997, 5018b4040991
+
+arrow-select 59.2.0
+  License expression: Apache-2.0
+  Authors: Apache Arrow <dev@arrow.apache.org>
+  Upstream: https://github.com/apache/arrow-rs
+  License document IDs: 283ea6cc2997, 5018b4040991
 
 atoi 2.0.0
   License expression: MIT
@@ -103,11 +109,11 @@ autocfg 1.5.0
   Upstream: https://github.com/cuviper/autocfg
   License document IDs: 954f335b8baf, 99afaa30c178
 
-base64 0.22.1
+base64 0.23.1
   License expression: MIT OR Apache-2.0
   Authors: Marshall Pierce <marshall@mpierce.org>
   Upstream: https://github.com/marshallpierce/rust-base64
-  License document IDs: 954f335b8baf, 6a8da4c78c72
+  License document IDs: 954f335b8baf, 2ff8d9734312
 
 bitflags 2.11.0
   License expression: MIT OR Apache-2.0
@@ -132,12 +138,6 @@ bumpalo 3.20.2
   Authors: Nick Fitzgerald <fitzgen@gmail.com>
   Upstream: https://github.com/fitzgen/bumpalo
   License document IDs: 954f335b8baf, 5662394bebb1
-
-byteorder 1.5.0
-  License expression: Unlicense OR MIT
-  Authors: Andrew Gallant <jamslam@gmail.com>
-  Upstream: https://github.com/BurntSushi/byteorder
-  License document IDs: 65314a6c9668, 154c1af2b38e
 
 bytes 1.11.1
   License expression: MIT
@@ -235,9 +235,9 @@ half 2.7.1
   Upstream: https://github.com/VoidStarKat/half-rs
   License document IDs: 4bf96504d6e8, 1847e0e06981
 
-hashbrown 0.16.1
+hashbrown 0.17.1
   License expression: MIT OR Apache-2.0
-  Authors: Amanieu d'Antras <amanieu@gmail.com>
+  Authors: not declared
   Upstream: https://github.com/rust-lang/hashbrown
   License document IDs: 954f335b8baf, ae9791f02f2b
 
@@ -258,18 +258,6 @@ iana-time-zone-haiku 0.1.2
   Authors: René Kijewski <crates.io@k6i.de>
   Upstream: https://github.com/strawlab/iana-time-zone
   License document IDs: 793420c92f3c, 3444712f3370
-
-indoc 2.0.7
-  License expression: MIT OR Apache-2.0
-  Authors: David Tolnay <dtolnay@gmail.com>
-  Upstream: https://github.com/dtolnay/indoc
-  License document IDs: 85ad950cce87, 30fefc3a7d6a
-
-integer-encoding 3.0.4
-  License expression: MIT
-  Authors: Lewin Bormann <lbo@spheniscida.de>
-  Upstream: https://github.com/dermesser/integer-encoding-rs
-  License document IDs: 30fa27937eca
 
 itoa 1.0.18
   License expression: MIT OR Apache-2.0
@@ -343,7 +331,7 @@ log 0.4.29
   Upstream: https://github.com/rust-lang/log
   License document IDs: 954f335b8baf, 14435fbcd271
 
-lz4_flex 0.11.6
+lz4_flex 0.14.0
   License expression: MIT
   Authors: Pascal Seitz <pascal.seitz@gmail.com>; Arthur Silva <arthurprs@gmail.com>; ticki <Ticki@users.noreply.github.com>
   Upstream: https://github.com/pseitz/lz4_flex
@@ -361,27 +349,15 @@ memmap2 0.9.11
   Upstream: https://github.com/RazrFalcon/memmap2-rs
   License document IDs: b733dbc79d3d, c18ee669bac9
 
-memoffset 0.9.1
-  License expression: MIT
-  Authors: Gilad Naaman <gilad.naaman@gmail.com>
-  Upstream: https://github.com/Gilnaa/memoffset
-  License document IDs: 3234ac558162
-
 miniz_oxide 0.8.9
   License expression: MIT OR Zlib OR Apache-2.0
   Authors: Frommi <daniil.liferenko@gmail.com>; oyvindln <oyvindln@users.noreply.github.com>; Rich Geldreich richgel99@gmail.com
   Upstream: https://github.com/Frommi/miniz_oxide/tree/master/miniz_oxide
   License document IDs: 7427abc63036, 4bf96504d6e8, ac9859ce4e9a, eac3911cc3d4
 
-num 0.4.3
+num-bigint 0.5.1
   License expression: MIT OR Apache-2.0
-  Authors: The Rust Project Developers
-  Upstream: https://github.com/rust-num/num
-  License document IDs: 954f335b8baf, 14435fbcd271
-
-num-bigint 0.4.6
-  License expression: MIT OR Apache-2.0
-  Authors: The Rust Project Developers
+  Authors: not declared
   Upstream: https://github.com/rust-num/num-bigint
   License document IDs: 954f335b8baf, 14435fbcd271
 
@@ -397,18 +373,6 @@ num-integer 0.1.46
   Upstream: https://github.com/rust-num/num-integer
   License document IDs: 954f335b8baf, 14435fbcd271
 
-num-iter 0.1.45
-  License expression: MIT OR Apache-2.0
-  Authors: The Rust Project Developers
-  Upstream: https://github.com/rust-num/num-iter
-  License document IDs: 954f335b8baf, 14435fbcd271
-
-num-rational 0.4.2
-  License expression: MIT OR Apache-2.0
-  Authors: The Rust Project Developers
-  Upstream: https://github.com/rust-num/num-rational
-  License document IDs: 954f335b8baf, 14435fbcd271
-
 num-traits 0.2.19
   License expression: MIT OR Apache-2.0
   Authors: The Rust Project Developers
@@ -421,23 +385,11 @@ once_cell 1.21.4
   Upstream: https://github.com/matklad/once_cell
   License document IDs: 954f335b8baf, 30fefc3a7d6a
 
-ordered-float 2.10.1
-  License expression: MIT
-  Authors: Jonathan Reem <jonathan.reem@gmail.com>; Matt Brubeck <mbrubeck@limpet.net>
-  Upstream: https://github.com/reem/rust-ordered-float
-  License document IDs: 42d8a095dbff
-
-parquet 56.2.0
+parquet 59.2.0
   License expression: Apache-2.0
   Authors: Apache Arrow <dev@arrow.apache.org>
   Upstream: https://github.com/apache/arrow-rs
-  License document IDs: 283ea6cc2997, 81399416f00b
-
-paste 1.0.15
-  License expression: MIT OR Apache-2.0
-  Authors: David Tolnay <dtolnay@gmail.com>
-  Upstream: https://github.com/dtolnay/paste
-  License document IDs: 85ad950cce87, 30fefc3a7d6a
+  License document IDs: 283ea6cc2997, 5018b4040991
 
 pkg-config 0.3.32
   License expression: MIT OR Apache-2.0
@@ -457,41 +409,35 @@ proc-macro2 1.0.106
   Upstream: https://github.com/dtolnay/proc-macro2
   License document IDs: 85ad950cce87, 30fefc3a7d6a
 
-pyo3 0.27.2
+pyo3 0.29.2
   License expression: MIT OR Apache-2.0
   Authors: PyO3 Project and Contributors <https://github.com/PyO3>
   Upstream: https://github.com/pyo3/pyo3
   License document IDs: f46077639918, cff53bcf0a6c
 
-pyo3-build-config 0.27.2
+pyo3-build-config 0.29.2
   License expression: MIT OR Apache-2.0
   Authors: PyO3 Project and Contributors <https://github.com/PyO3>
   Upstream: https://github.com/pyo3/pyo3
   License document IDs: f46077639918, cff53bcf0a6c
 
-pyo3-ffi 0.27.2
+pyo3-ffi 0.29.2
   License expression: MIT OR Apache-2.0
   Authors: PyO3 Project and Contributors <https://github.com/PyO3>
   Upstream: https://github.com/pyo3/pyo3
   License document IDs: f46077639918, cff53bcf0a6c
 
-pyo3-macros 0.27.2
+pyo3-macros 0.29.2
   License expression: MIT OR Apache-2.0
   Authors: PyO3 Project and Contributors <https://github.com/PyO3>
   Upstream: https://github.com/pyo3/pyo3
   License document IDs: f46077639918, cff53bcf0a6c
 
-pyo3-macros-backend 0.27.2
+pyo3-macros-backend 0.29.2
   License expression: MIT OR Apache-2.0
   Authors: PyO3 Project and Contributors <https://github.com/PyO3>
   Upstream: https://github.com/pyo3/pyo3
   License document IDs: f46077639918, cff53bcf0a6c
-
-python3-dll-a 0.2.15
-  License expression: MIT
-  Authors: Sergey Kvachonok <ravenexp@gmail.com>; messense <messense@icloud.com>; Adam Reichold <adam.reichold@t-online.de>
-  Upstream: https://github.com/PyO3/python3-dll-a
-  License document IDs: e604a6a51dc5
 
 quote 1.0.45
   License expression: MIT OR Apache-2.0
@@ -607,12 +553,6 @@ target-lexicon 0.13.5
   Upstream: https://github.com/bytecodealliance/target-lexicon
   License document IDs: 2f213ec6b135
 
-thrift 0.17.0
-  License expression: Apache-2.0
-  Authors: Apache Thrift Developers <dev@thrift.apache.org>
-  Upstream: https://github.com/apache/thrift/tree/master/lib/rs
-  License document IDs: 1bc86297d032
-
 tiny-keccak 2.0.2
   License expression: CC0-1.0
   Authors: debris <marek.kotewicz@gmail.com>
@@ -630,12 +570,6 @@ unicode-ident 1.0.24
   Authors: David Tolnay <dtolnay@gmail.com>
   Upstream: https://github.com/dtolnay/unicode-ident
   License document IDs: 85ad950cce87, 30fefc3a7d6a, 361d79129578
-
-unindent 0.2.4
-  License expression: MIT OR Apache-2.0
-  Authors: David Tolnay <dtolnay@gmail.com>
-  Upstream: https://github.com/dtolnay/indoc
-  License document IDs: 85ad950cce87, 30fefc3a7d6a
 
 version_check 0.9.5
   License expression: MIT/Apache-2.0
@@ -805,12 +739,9 @@ Document ID: 14435fbcd271
 Applies to:
   - bitflags 2.11.0 (LICENSE-MIT)
   - log 0.4.29 (LICENSE-MIT)
-  - num 0.4.3 (LICENSE-MIT)
-  - num-bigint 0.4.6 (LICENSE-MIT)
+  - num-bigint 0.5.1 (LICENSE-MIT)
   - num-complex 0.4.6 (LICENSE-MIT)
   - num-integer 0.1.46 (LICENSE-MIT)
-  - num-iter 0.1.45 (LICENSE-MIT)
-  - num-rational 0.4.2 (LICENSE-MIT)
   - num-traits 0.2.19 (LICENSE-MIT)
   - regex 1.13.1 (LICENSE-MIT)
   - regex-automata 0.4.18 (LICENSE-MIT)
@@ -847,7 +778,6 @@ DEALINGS IN THE SOFTWARE.
 Document ID: 154c1af2b38e
 Applies to:
   - aho-corasick 1.1.5 (LICENSE-MIT)
-  - byteorder 1.5.0 (LICENSE-MIT)
   - csv 1.4.0 (LICENSE-MIT)
   - csv-core 0.1.13 (LICENSE-MIT)
   - memchr 2.8.3 (LICENSE-MIT)
@@ -939,7 +869,6 @@ Document ID: 1bc86297d032
 Applies to:
   - adler2 2.0.1 (LICENSE-APACHE)
   - flatbuffers 25.12.19 (declared license fallback)
-  - thrift 0.17.0 (declared license fallback)
   - wasip2 1.0.2+wasi-0.2.9 (declared license fallback)
 
 Apache License
@@ -1176,15 +1105,16 @@ SOFTWARE.
 
 Document ID: 283ea6cc2997
 Applies to:
-  - arrow-array 56.2.0 (LICENSE.txt)
-  - arrow-buffer 56.2.0 (LICENSE.txt)
-  - arrow-cast 56.2.0 (LICENSE.txt)
-  - arrow-csv 56.2.0 (LICENSE.txt)
-  - arrow-data 56.2.0 (LICENSE.txt)
-  - arrow-ipc 56.2.0 (LICENSE.txt)
-  - arrow-schema 56.2.0 (LICENSE.txt)
-  - arrow-select 56.2.0 (LICENSE.txt)
-  - parquet 56.2.0 (LICENSE.txt)
+  - arrow-array 59.2.0 (LICENSE.txt)
+  - arrow-buffer 59.2.0 (LICENSE.txt)
+  - arrow-cast 59.2.0 (LICENSE.txt)
+  - arrow-csv 59.2.0 (LICENSE.txt)
+  - arrow-data 59.2.0 (LICENSE.txt)
+  - arrow-ipc 59.2.0 (LICENSE.txt)
+  - arrow-ord 59.2.0 (LICENSE.txt)
+  - arrow-schema 59.2.0 (LICENSE.txt)
+  - arrow-select 59.2.0 (LICENSE.txt)
+  - parquet 59.2.0 (LICENSE.txt)
 
 Apache License
                            Version 2.0, January 2004
@@ -1643,6 +1573,34 @@ Software.
 
 ==============================================================================
 
+Document ID: 2ff8d9734312
+Applies to:
+  - base64 0.23.1 (LICENSE-MIT)
+
+The MIT License (MIT)
+
+Copyright (c) 2025 Alice Maz, Marshall Pierce
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+==============================================================================
+
 Document ID: 30367d9a4ead
 Applies to:
   - zstd-sys 2.0.16+zstd.1.5.7 (LICENSE.BSD-3-Clause)
@@ -1682,40 +1640,9 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 ==============================================================================
 
-Document ID: 30fa27937eca
-Applies to:
-  - integer-encoding 3.0.4 (LICENSE)
-
-The MIT License (MIT)
-
-Copyright (c) 2016 Google Inc. (lewinb@google.com) -- though not an official
-Google product or in any way related!
-Copyright (c) 2018-2020 Lewin Bormann (lbo@spheniscida.de)
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to
-deal in the Software without restriction, including without limitation the
-rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
-sell copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
-IN THE SOFTWARE.
-
-==============================================================================
-
 Document ID: 30fefc3a7d6a
 Applies to:
   - adler2 2.0.1 (LICENSE-MIT)
-  - indoc 2.0.7 (LICENSE-MIT)
   - itoa 1.0.18 (LICENSE-MIT)
   - lexical-core 1.0.6 (LICENSE-MIT)
   - lexical-parse-float 1.0.6 (LICENSE-MIT)
@@ -1724,7 +1651,6 @@ Applies to:
   - lexical-write-float 1.0.6 (LICENSE-MIT)
   - lexical-write-integer 1.0.6 (LICENSE-MIT)
   - once_cell 1.21.4 (LICENSE-MIT)
-  - paste 1.0.15 (LICENSE-MIT)
   - portable-atomic 1.13.1 (LICENSE-MIT)
   - proc-macro2 1.0.106 (LICENSE-MIT)
   - quote 1.0.45 (LICENSE-MIT)
@@ -1736,7 +1662,6 @@ Applies to:
   - syn 2.0.117 (LICENSE-MIT)
   - syn 3.0.3 (LICENSE-MIT)
   - unicode-ident 1.0.24 (LICENSE-MIT)
-  - unindent 0.2.4 (LICENSE-MIT)
   - wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-MIT)
   - wit-bindgen 0.51.0 (LICENSE-MIT)
 
@@ -1763,32 +1688,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-
-==============================================================================
-
-Document ID: 3234ac558162
-Applies to:
-  - memoffset 0.9.1 (LICENSE)
-
-Copyright (c) 2017 Gilad Naaman
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
 
 ==============================================================================
 
@@ -1876,38 +1775,6 @@ Applies to:
   - core-foundation-sys 0.8.7 (LICENSE-MIT)
 
 Copyright (c) 2012-2013 Mozilla Foundation
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
-
-==============================================================================
-
-Document ID: 42d8a095dbff
-Applies to:
-  - ordered-float 2.10.1 (LICENSE-MIT)
-
-Copyright (c) 2015 Jonathan Reem
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -2185,6 +2052,35 @@ Apache License
       of your accepting any such warranty or additional liability.
 
    END OF TERMS AND CONDITIONS
+
+==============================================================================
+
+Document ID: 5018b4040991
+Applies to:
+  - arrow-array 59.2.0 (NOTICE.txt)
+  - arrow-buffer 59.2.0 (NOTICE.txt)
+  - arrow-cast 59.2.0 (NOTICE.txt)
+  - arrow-csv 59.2.0 (NOTICE.txt)
+  - arrow-data 59.2.0 (NOTICE.txt)
+  - arrow-ipc 59.2.0 (NOTICE.txt)
+  - arrow-ord 59.2.0 (NOTICE.txt)
+  - arrow-schema 59.2.0 (NOTICE.txt)
+  - arrow-select 59.2.0 (NOTICE.txt)
+  - parquet 59.2.0 (NOTICE.txt)
+
+Apache Arrow
+Copyright 2016-2026 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+This product includes software from the chronoutil crate (MIT)
+ * Copyright (c) 2020-2022 Oliver Margetts
+ * https://github.com/olliemath/chronoutil
+
+This product includes software from the compact-thrift project (Apache 2.0)
+ * Copyright Jörn Horstmann
+ * https://github.com/jhorstmann/compact-thrift
 
 ==============================================================================
 
@@ -2548,7 +2444,6 @@ SOFTWARE.
 Document ID: 65314a6c9668
 Applies to:
   - aho-corasick 1.1.5 (COPYING)
-  - byteorder 1.5.0 (COPYING)
   - csv 1.4.0 (COPYING)
   - csv-core 0.1.13 (COPYING)
   - memchr 2.8.3 (COPYING)
@@ -2556,34 +2451,6 @@ Applies to:
 This project is dual-licensed under the Unlicense and MIT licenses.
 
 You may use this code under the terms of either license.
-
-==============================================================================
-
-Document ID: 6a8da4c78c72
-Applies to:
-  - base64 0.22.1 (LICENSE-MIT)
-
-The MIT License (MIT)
-
-Copyright (c) 2015 Alice Maz
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 
 ==============================================================================
 
@@ -3462,105 +3329,6 @@ limitations under the License.
 
 ==============================================================================
 
-Document ID: 81399416f00b
-Applies to:
-  - arrow-array 56.2.0 (NOTICE.txt)
-  - arrow-buffer 56.2.0 (NOTICE.txt)
-  - arrow-cast 56.2.0 (NOTICE.txt)
-  - arrow-csv 56.2.0 (NOTICE.txt)
-  - arrow-data 56.2.0 (NOTICE.txt)
-  - arrow-ipc 56.2.0 (NOTICE.txt)
-  - arrow-schema 56.2.0 (NOTICE.txt)
-  - arrow-select 56.2.0 (NOTICE.txt)
-  - parquet 56.2.0 (NOTICE.txt)
-
-Apache Arrow
-Copyright 2016-2019 The Apache Software Foundation
-
-This product includes software developed at
-The Apache Software Foundation (http://www.apache.org/).
-
-This product includes software from the SFrame project (BSD, 3-clause).
-* Copyright (C) 2015 Dato, Inc.
-* Copyright (c) 2009 Carnegie Mellon University.
-
-This product includes software from the Feather project (Apache 2.0)
-https://github.com/wesm/feather
-
-This product includes software from the DyND project (BSD 2-clause)
-https://github.com/libdynd
-
-This product includes software from the LLVM project
- * distributed under the University of Illinois Open Source
-
-This product includes software from the google-lint project
- * Copyright (c) 2009 Google Inc. All rights reserved.
-
-This product includes software from the mman-win32 project
- * Copyright https://code.google.com/p/mman-win32/
- * Licensed under the MIT License;
-
-This product includes software from the LevelDB project
- * Copyright (c) 2011 The LevelDB Authors. All rights reserved.
- * Use of this source code is governed by a BSD-style license that can be
- * Moved from Kudu http://github.com/cloudera/kudu
-
-This product includes software from the CMake project
- * Copyright 2001-2009 Kitware, Inc.
- * Copyright 2012-2014 Continuum Analytics, Inc.
- * All rights reserved.
-
-This product includes software from https://github.com/matthew-brett/multibuild (BSD 2-clause)
- * Copyright (c) 2013-2016, Matt Terry and Matthew Brett; all rights reserved.
-
-This product includes software from the Ibis project (Apache 2.0)
- * Copyright (c) 2015 Cloudera, Inc.
- * https://github.com/cloudera/ibis
-
-This product includes software from Dremio (Apache 2.0)
-  * Copyright (C) 2017-2018 Dremio Corporation
-  * https://github.com/dremio/dremio-oss
-
-This product includes software from Google Guava (Apache 2.0)
-  * Copyright (C) 2007 The Guava Authors
-  * https://github.com/google/guava
-
-This product include software from CMake (BSD 3-Clause)
-  * CMake - Cross Platform Makefile Generator
-  * Copyright 2000-2019 Kitware, Inc. and Contributors
-
-The web site includes files generated by Jekyll.
-
---------------------------------------------------------------------------------
-
-This product includes code from Apache Kudu, which includes the following in
-its NOTICE file:
-
-  Apache Kudu
-  Copyright 2016 The Apache Software Foundation
-
-  This product includes software developed at
-  The Apache Software Foundation (http://www.apache.org/).
-
-  Portions of this software were developed at
-  Cloudera, Inc (http://www.cloudera.com/).
-
---------------------------------------------------------------------------------
-
-This product includes code from Apache ORC, which includes the following in
-its NOTICE file:
-
-  Apache ORC
-  Copyright 2013-2019 The Apache Software Foundation
-
-  This product includes software developed by The Apache Software
-  Foundation (http://www.apache.org/).
-
-  This product includes software developed by Hewlett-Packard:
-  (c) Copyright [2014-2015] Hewlett-Packard Development Company, L.P
-
-==============================================================================
-
 Document ID: 84b7e1b767be
 Applies to:
   - zstd 0.13.3 (LICENSE)
@@ -3621,10 +3389,8 @@ DEALINGS IN THE SOFTWARE.
 
 Document ID: 85ad950cce87
 Applies to:
-  - indoc 2.0.7 (LICENSE-APACHE)
   - itoa 1.0.18 (LICENSE-APACHE)
   - libc 0.2.183 (LICENSE-APACHE)
-  - paste 1.0.15 (LICENSE-APACHE)
   - proc-macro2 1.0.106 (LICENSE-APACHE)
   - quote 1.0.45 (LICENSE-APACHE)
   - rustversion 1.0.22 (LICENSE-APACHE)
@@ -3636,7 +3402,6 @@ Applies to:
   - syn 2.0.117 (LICENSE-APACHE)
   - syn 3.0.3 (LICENSE-APACHE)
   - unicode-ident 1.0.24 (LICENSE-APACHE)
-  - unindent 0.2.4 (LICENSE-APACHE)
 
 Apache License
                         Version 2.0, January 2004
@@ -3883,7 +3648,7 @@ Document ID: 954f335b8baf
 Applies to:
   - ahash 0.8.12 (LICENSE-APACHE)
   - autocfg 1.5.0 (LICENSE-APACHE)
-  - base64 0.22.1 (LICENSE-APACHE)
+  - base64 0.23.1 (LICENSE-APACHE)
   - bitflags 2.11.0 (LICENSE-APACHE)
   - bumpalo 3.20.2 (LICENSE-APACHE)
   - cc 1.2.58 (LICENSE-APACHE)
@@ -3893,17 +3658,14 @@ Applies to:
   - core-foundation-sys 0.8.7 (LICENSE-APACHE)
   - find-msvc-tools 0.1.9 (LICENSE-APACHE)
   - flate2 1.1.9 (LICENSE-APACHE)
-  - hashbrown 0.16.1 (LICENSE-APACHE)
+  - hashbrown 0.17.1 (LICENSE-APACHE)
   - heck 0.5.0 (LICENSE-APACHE)
   - jobserver 0.1.34 (LICENSE-APACHE)
   - js-sys 0.3.93 (LICENSE-APACHE)
   - log 0.4.29 (LICENSE-APACHE)
-  - num 0.4.3 (LICENSE-APACHE)
-  - num-bigint 0.4.6 (LICENSE-APACHE)
+  - num-bigint 0.5.1 (LICENSE-APACHE)
   - num-complex 0.4.6 (LICENSE-APACHE)
   - num-integer 0.1.46 (LICENSE-APACHE)
-  - num-iter 0.1.45 (LICENSE-APACHE)
-  - num-rational 0.4.2 (LICENSE-APACHE)
   - num-traits 0.2.19 (LICENSE-APACHE)
   - once_cell 1.21.4 (LICENSE-APACHE)
   - pkg-config 0.3.32 (LICENSE-APACHE)
@@ -4471,7 +4233,7 @@ Document ID: ae9791f02f2b
 Applies to:
   - const-random 0.1.18 (LICENSE-MIT)
   - const-random-macro 0.1.16 (LICENSE-MIT)
-  - hashbrown 0.16.1 (LICENSE-MIT)
+  - hashbrown 0.17.1 (LICENSE-MIT)
 
 Copyright (c) 2016 Amanieu d'Antras
 
@@ -5086,7 +4848,7 @@ limitations under the License.
 
 Document ID: b7f7d53ece5d
 Applies to:
-  - lz4_flex 0.11.6 (LICENSE)
+  - lz4_flex 0.14.0 (LICENSE)
 
 The MIT License (MIT)
 
@@ -5108,6 +4870,34 @@ FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
 COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
 IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+==============================================================================
+
+Document ID: bddc4356d6da
+Applies to:
+  - arrow-array 59.2.0 (LICENSE-MIT)
+
+MIT License
+
+Copyright (c) 2020-2022 Oliver Margetts
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 
 ==============================================================================
 
@@ -5514,11 +5304,11 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 Document ID: cff53bcf0a6c
 Applies to:
-  - pyo3 0.27.2 (LICENSE-MIT)
-  - pyo3-build-config 0.27.2 (LICENSE-MIT)
-  - pyo3-ffi 0.27.2 (LICENSE-MIT)
-  - pyo3-macros 0.27.2 (LICENSE-MIT)
-  - pyo3-macros-backend 0.27.2 (LICENSE-MIT)
+  - pyo3 0.29.2 (LICENSE-MIT)
+  - pyo3-build-config 0.29.2 (LICENSE-MIT)
+  - pyo3-ffi 0.29.2 (LICENSE-MIT)
+  - pyo3-macros 0.29.2 (LICENSE-MIT)
+  - pyo3-macros-backend 0.29.2 (LICENSE-MIT)
 
 Copyright (c) 2023-present PyO3 Project and Contributors.  https://github.com/PyO3
 
@@ -5607,34 +5397,6 @@ Applies to:
 The MIT License (MIT)
 
 Copyright 2017-2023 Eira Fransham.
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-
-==============================================================================
-
-Document ID: e604a6a51dc5
-Applies to:
-  - python3-dll-a 0.2.15 (LICENSE)
-
-MIT License
-
-Copyright (c) 2022 Sergey Kvachonok, Adam Reichold, messense <messense@icloud.com>
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -5995,11 +5757,11 @@ AUTHORS: (ordered alphabetically)
 
 Document ID: f46077639918
 Applies to:
-  - pyo3 0.27.2 (LICENSE-APACHE)
-  - pyo3-build-config 0.27.2 (LICENSE-APACHE)
-  - pyo3-ffi 0.27.2 (LICENSE-APACHE)
-  - pyo3-macros 0.27.2 (LICENSE-APACHE)
-  - pyo3-macros-backend 0.27.2 (LICENSE-APACHE)
+  - pyo3 0.29.2 (LICENSE-APACHE)
+  - pyo3-build-config 0.29.2 (LICENSE-APACHE)
+  - pyo3-ffi 0.29.2 (LICENSE-APACHE)
+  - pyo3-macros 0.29.2 (LICENSE-APACHE)
+  - pyo3-macros-backend 0.29.2 (LICENSE-APACHE)
 
 Copyright (c) 2017-present PyO3 Project and Contributors.  https://github.com/PyO3
 

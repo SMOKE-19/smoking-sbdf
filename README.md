@@ -8,7 +8,7 @@
 - 지원 Python: CPython 3.10–3.14
 - 지원 플랫폼: Linux, Windows
 
-v0.1.4의 핵심 변환 기능과 패키징은 완료되었으며 공개 API와 기본 정책을 이 문서에 정리한다.
+v0.1.5의 핵심 변환 기능과 패키징은 완료되었으며 공개 API와 기본 정책을 이 문서에 정리한다.
 
 ## 제공 기능
 
@@ -27,11 +27,11 @@ vendored C writer와 C FFI는 사용하지 않는다. Python은 경로와 DataFr
 ## 빠른 시작
 
 사용 중인 CPython 버전과 플랫폼에 맞는 wheel을
-[`v0.1.4` GitHub Release](https://github.com/SMOKE-19/smoking-sbdf/releases/tag/v0.1.4)에서
+[`v0.1.5` GitHub Release](https://github.com/SMOKE-19/smoking-sbdf/releases/tag/v0.1.5)에서
 다운로드한 뒤 설치한다.
 
 ```bash
-python -m pip install ./smoking_sbdf-0.1.4-<python-tag>-<platform-tag>.whl
+python -m pip install ./smoking_sbdf-0.1.5-<python-tag>-<platform-tag>.whl
 ```
 
 예를 들어 CPython 3.14 Linux x86_64에서는 `cp314`·`manylinux` wheel을
@@ -145,7 +145,7 @@ row key 기준 전역 정렬이나 slice 재편성은 수행하지 않는다. �
 
 ## 현재 범위
 
-v0.1.4는 로컬 파일 변환과 sidecar 생성을 제공한다. 원격 객체 저장소 읽기, sidecar 조회 엔진, DataFrame chunk streaming과 CSV dialect 전체 노출은 패키지 범위에 포함하지 않는다.
+v0.1.5는 로컬 파일 변환과 sidecar 생성을 제공한다. 원격 객체 저장소 읽기, sidecar 조회 엔진, DataFrame chunk streaming과 CSV dialect 전체 노출은 패키지 범위에 포함하지 않는다.
 
 ## 라이선스와 상표
 

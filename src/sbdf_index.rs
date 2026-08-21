@@ -126,7 +126,7 @@ pub(crate) fn generate_sidecar(
         .set_compression(Compression::SNAPPY)
         .set_dictionary_enabled(true)
         .set_statistics_enabled(EnabledStatistics::Page)
-        .set_max_row_group_size(usize::MAX)
+        .set_max_row_group_row_count(Some(usize::MAX))
         .build();
     let mut writer = ArrowWriter::try_new(output, Arc::clone(&sidecar_schema), Some(properties))
         .map_err(|error| format!("failed to initialize Parquet sidecar writer: {error}"))?;

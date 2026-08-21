@@ -4908,7 +4908,7 @@ mod tests {
         )
         .unwrap();
         let properties = WriterProperties::builder()
-            .set_max_row_group_size(2)
+            .set_max_row_group_row_count(Some(2))
             .build();
         let mut parquet_writer = ArrowWriter::try_new(
             File::create(&parquet_path).unwrap(),
