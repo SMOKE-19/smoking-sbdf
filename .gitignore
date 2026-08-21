@@ -1,0 +1,36 @@
+target/
+dist/
+.venv/
+venv/
+*.egg-info/
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+python/streaming_sbdf_rs/*.so
+src/streaming_sbdf_rs/*.so
+src/smoking_sbdf/*.so
+
+.TODO/
+AGENTS.md
+
+# Local development and internal project records.
+tests/
+docs/
+examples/
+USAGE.md
+build.md
+
+# Local conversion, benchmark, and interrupted-publish artifacts.
+*.sbdf
+*.sbdf.sidecar.parquet
+.*.work-*/
+*.partial
+*.ready
+profile*.csv
+profile*.parquet
