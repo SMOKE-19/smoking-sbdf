@@ -1,7 +1,7 @@
 THIRD-PARTY RUST DEPENDENCY LICENSES
 ====================================
 
-Generated from the Cargo.lock used for the v0.1.5 release. This file is a
+Generated from the Cargo.lock used for the v0.1.6 release. This file is a
 static license snapshot for the published source and binary artifacts.
 
 PACKAGE INVENTORY

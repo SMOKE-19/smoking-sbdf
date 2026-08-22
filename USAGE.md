@@ -24,7 +24,7 @@ CPython 3.10–3.14를 지원한다. GitHub Release에서 받은 wheel 파일이
 디렉터리에 있다면 다음처럼 설치한다.
 
 ```bash
-python -m pip install ./smoking_sbdf-0.1.5-<python-tag>-<platform-tag>.whl
+python -m pip install ./smoking_sbdf-0.1.6-<python-tag>-<platform-tag>.whl
 ```
 
 파일 이름에 `cp313`이 있으면 CPython 3.13용이다. `manylinux`는 Linux,

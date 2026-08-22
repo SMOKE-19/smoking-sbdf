@@ -1,6 +1,6 @@
 [package]
 name = "smoking-sbdf"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2021"
 description = "Rust core for streaming CSV, Parquet, and DataFrame conversion to Spotfire SBDF"
 license = "BSD-3-Clause"
