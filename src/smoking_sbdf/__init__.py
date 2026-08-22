@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from importlib import import_module
 from importlib.util import find_spec
@@ -25,6 +26,48 @@ InputFormat = Literal[
 ]
 MIN_WORKERS = 1
 MAX_WORKERS = 8
+
+
+@dataclass(frozen=True, slots=True)
+class SbdfConversionResult:
+    """Execution metadata for one completed file-to-SBDF conversion."""
+
+    output_path: Path
+    input_files: tuple[Path, ...]
+    requested_workers: int
+    effective_workers: int
+    requested_batch_size: int
+    effective_batch_sizes: tuple[int, ...]
+    row_count: int
+    slice_count: int
+    sidecar_path: Path | None
+
+
+def _conversion_result(
+    *,
+    output_path: Path,
+    input_files: Sequence[Path],
+    requested_workers: int,
+    requested_batch_size: int,
+    native_stats: tuple[int, list[int], int, int],
+    sidecar_path: Path | None,
+) -> SbdfConversionResult:
+    effective_workers, effective_batch_sizes, row_count, slice_count = native_stats
+    if len(effective_batch_sizes) != len(input_files):
+        raise RuntimeError(
+            "native conversion statistics do not match the resolved input files"
+        )
+    return SbdfConversionResult(
+        output_path=output_path,
+        input_files=tuple(input_files),
+        requested_workers=requested_workers,
+        effective_workers=effective_workers,
+        requested_batch_size=requested_batch_size,
+        effective_batch_sizes=tuple(effective_batch_sizes),
+        row_count=row_count,
+        slice_count=slice_count,
+        sidecar_path=sidecar_path,
+    )
 
 
 def _validate_workers(workers: int) -> int:
@@ -83,13 +126,13 @@ def _generate_requested_sidecar(
     row_key_columns: Sequence[str] | None,
     sidecar_path: str | Path | None,
     table_id: str | None,
-) -> None:
+) -> Path | None:
     if row_key_columns is None:
         if sidecar_path is not None or table_id is not None:
             raise ValueError(
                 "sidecar_path and table_id require row_key_columns"
             )
-        return
+        return None
     resolved_sidecar_path = (
         sbdf_sidecar_path(sbdf_path)
         if sidecar_path is None
@@ -107,6 +150,7 @@ def _generate_requested_sidecar(
         # sidecar that now points at unrelated byte ranges.
         resolved_sidecar_path.unlink(missing_ok=True)
         raise
+    return resolved_sidecar_path
 
 
 def _validate_requested_sidecar(
@@ -139,7 +183,7 @@ def _validate_requested_sidecar(
         raise ValueError("table_id must be a non-empty string")
 
 
-def csv_to_sbdf_streaming(
+def _csv_to_sbdf_streaming_result(
     csv_path: str | Path,
     sbdf_path: str | Path,
     *,
@@ -154,7 +198,7 @@ def csv_to_sbdf_streaming(
     row_key_columns: Sequence[str] | None = None,
     sidecar_path: str | Path | None = None,
     table_id: str | None = None,
-) -> Path:
+) -> SbdfConversionResult:
     """Stream CSV into SBDF with 1–8 workers; one worker is the default."""
     workers = _validate_workers(workers)
     _validate_requested_sidecar(
@@ -172,7 +216,7 @@ def csv_to_sbdf_streaming(
     csv_path = Path(csv_path)
     sbdf_path = Path(sbdf_path)
     sbdf_path.parent.mkdir(parents=True, exist_ok=True)
-    _csv_to_sbdf_streaming(
+    native_stats = _csv_to_sbdf_streaming(
         str(csv_path),
         str(sbdf_path),
         batch_size=batch_size,
@@ -184,10 +228,51 @@ def csv_to_sbdf_streaming(
         adaptive_encoding=adaptive_encoding,
         workers=workers,
     )
-    _generate_requested_sidecar(
+    generated_sidecar = _generate_requested_sidecar(
         sbdf_path, row_key_columns, sidecar_path, table_id
     )
-    return sbdf_path
+    return _conversion_result(
+        output_path=sbdf_path,
+        input_files=(csv_path,),
+        requested_workers=workers,
+        requested_batch_size=batch_size,
+        native_stats=native_stats,
+        sidecar_path=generated_sidecar,
+    )
+
+
+def csv_to_sbdf_streaming(
+    csv_path: str | Path,
+    sbdf_path: str | Path,
+    *,
+    batch_size: int = 5_000,
+    infer_schema_rows: int = 10_000,
+    column_types: dict[str, str] | None = None,
+    delimiter: str | bytes = ",",
+    has_header: bool = True,
+    encoding_rle: bool = True,
+    adaptive_encoding: bool = False,
+    workers: int = 1,
+    row_key_columns: Sequence[str] | None = None,
+    sidecar_path: str | Path | None = None,
+    table_id: str | None = None,
+) -> Path:
+    """Stream CSV into SBDF with 1–8 workers; one worker is the default."""
+    return _csv_to_sbdf_streaming_result(
+        csv_path,
+        sbdf_path,
+        batch_size=batch_size,
+        infer_schema_rows=infer_schema_rows,
+        column_types=column_types,
+        delimiter=delimiter,
+        has_header=has_header,
+        encoding_rle=encoding_rle,
+        adaptive_encoding=adaptive_encoding,
+        workers=workers,
+        row_key_columns=row_key_columns,
+        sidecar_path=sidecar_path,
+        table_id=table_id,
+    ).output_path
 
 
 def _dataframe_batch(dataframe: object) -> tuple[list[str], list[str], dict[str, list]]:
@@ -460,6 +545,51 @@ def parquet_to_sbdf_streaming(
     return sbdf_path
 
 
+def _parquet_files_to_sbdf_streaming_result(
+    parquet_files: list[str | Path],
+    sbdf_path: str | Path,
+    *,
+    batch_size: int = 5_000,
+    column_types: dict[str, str] | None = None,
+    encoding_rle: bool = True,
+    adaptive_encoding: bool = False,
+    workers: int = 3,
+    adaptive_workers: bool = True,
+    row_key_columns: Sequence[str] | None = None,
+    sidecar_path: str | Path | None = None,
+    table_id: str | None = None,
+) -> SbdfConversionResult:
+    """Stream Parquet files with 1–8 workers into one SBDF table."""
+    workers = _validate_workers(workers)
+    _validate_requested_sidecar(
+        sbdf_path, row_key_columns, sidecar_path, table_id
+    )
+    parquet_files = [Path(path) for path in parquet_files]
+    sbdf_path = Path(sbdf_path)
+    sbdf_path.parent.mkdir(parents=True, exist_ok=True)
+    native_stats = _parquet_files_to_sbdf_streaming(
+        [str(path) for path in parquet_files],
+        str(sbdf_path),
+        batch_size=batch_size,
+        column_types=column_types,
+        encoding_rle=encoding_rle,
+        adaptive_encoding=adaptive_encoding,
+        workers=workers,
+        adaptive_workers=adaptive_workers,
+    )
+    generated_sidecar = _generate_requested_sidecar(
+        sbdf_path, row_key_columns, sidecar_path, table_id
+    )
+    return _conversion_result(
+        output_path=sbdf_path,
+        input_files=parquet_files,
+        requested_workers=workers,
+        requested_batch_size=batch_size,
+        native_stats=native_stats,
+        sidecar_path=generated_sidecar,
+    )
+
+
 def parquet_files_to_sbdf_streaming(
     parquet_files: list[str | Path],
     sbdf_path: str | Path,
@@ -475,27 +605,19 @@ def parquet_files_to_sbdf_streaming(
     table_id: str | None = None,
 ) -> Path:
     """Stream Parquet files with 1–8 workers into one SBDF table."""
-    workers = _validate_workers(workers)
-    _validate_requested_sidecar(
-        sbdf_path, row_key_columns, sidecar_path, table_id
-    )
-    parquet_files = [Path(path) for path in parquet_files]
-    sbdf_path = Path(sbdf_path)
-    sbdf_path.parent.mkdir(parents=True, exist_ok=True)
-    _parquet_files_to_sbdf_streaming(
-        [str(path) for path in parquet_files],
-        str(sbdf_path),
+    return _parquet_files_to_sbdf_streaming_result(
+        parquet_files,
+        sbdf_path,
         batch_size=batch_size,
         column_types=column_types,
         encoding_rle=encoding_rle,
         adaptive_encoding=adaptive_encoding,
         workers=workers,
         adaptive_workers=adaptive_workers,
-    )
-    _generate_requested_sidecar(
-        sbdf_path, row_key_columns, sidecar_path, table_id
-    )
-    return sbdf_path
+        row_key_columns=row_key_columns,
+        sidecar_path=sidecar_path,
+        table_id=table_id,
+    ).output_path
 
 
 def parquet_dataset_to_sbdf_streaming(
@@ -676,10 +798,83 @@ def convert(
     return parquet_manifest_to_sbdf_streaming(source, sbdf_path, **parquet_options)
 
 
+def convert_with_result(
+    input_path: str | Path,
+    sbdf_path: str | Path,
+    *,
+    input_format: InputFormat | str = "auto",
+    batch_size: int = 5_000,
+    column_types: dict[str, str] | None = None,
+    encoding_rle: bool = True,
+    adaptive_encoding: bool = False,
+    workers: int | None = None,
+    adaptive_workers: bool = True,
+    infer_schema_rows: int = 10_000,
+    delimiter: str | bytes = ",",
+    has_header: bool = True,
+    recursive: bool = False,
+    row_key_columns: Sequence[str] | None = None,
+    sidecar_path: str | Path | None = None,
+    table_id: str | None = None,
+) -> SbdfConversionResult:
+    """Convert a file input and return paths plus effective execution metadata."""
+    source = Path(input_path)
+    resolved_format = _resolve_input_format(source, input_format)
+    if resolved_format == "csv":
+        return _csv_to_sbdf_streaming_result(
+            source,
+            sbdf_path,
+            batch_size=batch_size,
+            infer_schema_rows=infer_schema_rows,
+            column_types=column_types,
+            delimiter=delimiter,
+            has_header=has_header,
+            encoding_rle=encoding_rle,
+            adaptive_encoding=adaptive_encoding,
+            workers=1 if workers is None else workers,
+            row_key_columns=row_key_columns,
+            sidecar_path=sidecar_path,
+            table_id=table_id,
+        )
+
+    if resolved_format == "parquet":
+        parquet_files = [source]
+    elif resolved_format == "parquet-dataset":
+        if not source.is_dir():
+            raise ValueError(f"dataset_path is not a directory: {source}")
+        pattern = "**/*.parquet" if recursive else "*.parquet"
+        parquet_files = sorted(source.glob(pattern))
+    else:
+        base_path = source.parent
+        parquet_files = []
+        for line in source.read_text(encoding="utf-8").splitlines():
+            entry = line.strip()
+            if not entry or entry.startswith("#"):
+                continue
+            path = Path(entry)
+            parquet_files.append(path if path.is_absolute() else base_path / path)
+
+    return _parquet_files_to_sbdf_streaming_result(
+        parquet_files,
+        sbdf_path,
+        batch_size=batch_size,
+        column_types=column_types,
+        encoding_rle=encoding_rle,
+        adaptive_encoding=adaptive_encoding,
+        workers=3 if workers is None else workers,
+        adaptive_workers=adaptive_workers,
+        row_key_columns=row_key_columns,
+        sidecar_path=sidecar_path,
+        table_id=table_id,
+    )
+
+
 __all__ = [
     "SBDFError",
+    "SbdfConversionResult",
     "StreamingSbdfWriter",
     "convert",
+    "convert_with_result",
     "csv_to_sbdf_streaming",
     "dataframe_to_sbdf",
     "generate_sbdf_sidecar",
@@ -692,6 +887,3 @@ __all__ = [
     "sbdf_sidecar_path",
     "to_sbdf",
 ]
-
-
-install_dataframe_methods()

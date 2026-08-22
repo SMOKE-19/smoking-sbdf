@@ -1,8 +1,8 @@
 THIRD-PARTY RUST DEPENDENCY LICENSES
 ====================================
 
-Generated deterministically from Cargo.lock with
-scripts/generate_third_party_licenses.py.
+Generated from the Cargo.lock used for the v0.1.5 release. This file is a
+static license snapshot for the published source and binary artifacts.
 
 PACKAGE INVENTORY
 -----------------

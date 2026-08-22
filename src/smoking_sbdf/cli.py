@@ -50,6 +50,7 @@ DataFrame이 메모리에 있으면 다음처럼 저장한다.
 ```python
 import smoking_sbdf
 
+smoking_sbdf.install_dataframe_methods()
 dataframe.to_sbdf("output.sbdf")
 ```
 

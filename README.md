@@ -5,10 +5,14 @@
 - 배포 패키지: `smoking-sbdf`
 - Python import: `smoking_sbdf`
 - CLI: `smoking-sbdf`
-- 지원 Python: CPython 3.10–3.14
-- 지원 플랫폼: Linux, Windows
+- 제공 wheel: CPython 3.10–3.14, Linux x86_64·Windows x86_64
 
-v0.1.5의 핵심 변환 기능과 패키징은 완료되었으며 공개 API와 기본 정책을 이 문서에 정리한다.
+## 프로젝트 상태
+
+개인 사용을 위해 만든 구현과 빌드 결과를 `as-is`로 공개한
+스냅샷이다. PyPI 게시, 정기 릴리스, 호환성 보장, 기능 로드맵과
+사용자 지원을 운영하지 않는다. 현재 코드와 `v0.1.5` 산출물은
+필요한 범위에서 자유롭게 포크·수정해 사용할 수 있다.
 
 ## 제공 기능
 
@@ -35,7 +39,7 @@ python -m pip install ./smoking_sbdf-0.1.5-<python-tag>-<platform-tag>.whl
 ```
 
 예를 들어 CPython 3.14 Linux x86_64에서는 `cp314`·`manylinux` wheel을
-사용한다. 현재 PyPI 인덱스에는 게시하지 않았다.
+사용한다. PyPI 인덱스에는 게시하지 않는다.
 
 Python에서는 입력 형식을 자동 판별하는 `convert()`가 기본 진입점이다.
 
@@ -94,9 +98,26 @@ DataFrame API는 이미 메모리에 올라온 객체를 한 batch로 기록하�
 import pandas as pd
 import smoking_sbdf
 
+smoking_sbdf.install_dataframe_methods()
 frame = pd.DataFrame({"wafer_id": [1, 2], "value": [3.0, 4.0]})
 frame.to_sbdf("output.sbdf")
 ```
+
+`DataFrame.to_sbdf()`는 전역 monkey patch이므로 import 시 자동 등록하지 않는다.
+메서드가 필요하지 않은 런타임은 `dataframe_to_sbdf(frame, path)` 함수만 사용하면 된다.
+
+실제 worker, 파일별 batch cap과 출력 행·slice 수가 필요하면 구조화된 결과 API를 사용한다.
+
+```python
+from smoking_sbdf import convert_with_result
+
+result = convert_with_result("input.parquet", "output.sbdf", workers=3)
+print(result.effective_workers)
+print(dict(zip(result.input_files, result.effective_batch_sizes)))
+```
+
+`effective_batch_sizes`는 `input_files`와 같은 순서다. 변환 중 이미 계산한 cap과
+카운터를 반환하므로 통계를 위해 입력이나 SBDF를 다시 스캔하지 않는다.
 
 ## 프로젝트 README 초기화
 
@@ -142,6 +163,13 @@ row key 기준 전역 정렬이나 slice 재편성은 수행하지 않는다. �
 - `src/sbdf_index.rs`: Parquet sidecar 생성
 - `src/smoking_sbdf/`: Python API와 CLI
 - `src/type_rules/`: 컬럼명·dtype 매핑 규칙
+
+## 문서
+
+- [USAGE.md](USAGE.md): Python 초보자를 포함한 설치·API·CLI 사용법
+- [BUILD.md](BUILD.md): 로컬 개발 설치, 검사와 wheel 생성
+- [코드베이스 가이드](docs/CODEBASE_GUIDE.md): 사람과 LLM을 위한 구조, 흐름과 불변 조건
+- [성능 기록](docs/PERFORMANCE.md): worker·batch·encoding 기본값의 측정 근거
 
 ## 현재 범위
 

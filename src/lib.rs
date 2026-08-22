@@ -1671,6 +1671,7 @@ struct FragmentResult {
     sequence: usize,
     path: PathBuf,
     row_count: usize,
+    slice_count: usize,
     byte_len: u64,
     schema_checksum: u64,
 }
@@ -1681,6 +1682,8 @@ struct SbdfAssembler {
     writer: StreamingSbdfWriter,
     manifest: File,
     schema_checksum: u64,
+    row_count: usize,
+    slice_count: usize,
 }
 
 impl SbdfAssembler {
@@ -1708,6 +1711,8 @@ impl SbdfAssembler {
             writer,
             manifest,
             schema_checksum: config.fingerprint(),
+            row_count: 0,
+            slice_count: 0,
         })
     }
 
@@ -1768,6 +1773,8 @@ impl SbdfAssembler {
             fragment.path.display()
         )
         .map_err(|error| format!("failed to update fragment manifest: {error}"))?;
+        self.row_count = self.row_count.saturating_add(fragment.row_count);
+        self.slice_count = self.slice_count.saturating_add(fragment.slice_count);
         fs::remove_file(&fragment.path).map_err(|error| {
             format!(
                 "failed to remove merged fragment '{}': {error}",
@@ -1777,7 +1784,7 @@ impl SbdfAssembler {
         Ok(())
     }
 
-    fn finish(mut self) -> Result<(), String> {
+    fn finish(mut self) -> Result<(usize, usize), String> {
         self.writer
             .finish(true)
             .map_err(|error| error.to_string())?;
@@ -1791,7 +1798,8 @@ impl SbdfAssembler {
                 self.target.display(),
                 partial.display()
             )
-        })
+        })?;
+        Ok((self.row_count, self.slice_count))
     }
 }
 
@@ -1800,6 +1808,8 @@ struct SequentialDirectSbdfWriter {
     workspace: TempWorkspace,
     output: BufWriter<File>,
     end_marker: Vec<u8>,
+    row_count: usize,
+    slice_count: usize,
 }
 
 impl SequentialDirectSbdfWriter {
@@ -1830,6 +1840,8 @@ impl SequentialDirectSbdfWriter {
             workspace,
             output: BufWriter::with_capacity(DIRECT_SINK_BUFFER_BYTES, file),
             end_marker,
+            row_count: 0,
+            slice_count: 0,
         })
     }
 
@@ -1860,6 +1872,8 @@ impl SequentialDirectSbdfWriter {
                 invalids.as_deref(),
             )?;
         }
+        self.row_count = self.row_count.saturating_add(batch.num_rows());
+        self.slice_count = self.slice_count.saturating_add(1);
         Ok(())
     }
 
@@ -1888,10 +1902,12 @@ impl SequentialDirectSbdfWriter {
                 format!("failed to encode Rust SBDF column '{column_name}': {error}")
             })?;
         }
+        self.row_count = self.row_count.saturating_add(batch.rows());
+        self.slice_count = self.slice_count.saturating_add(1);
         Ok(())
     }
 
-    fn finish(mut self) -> Result<(), String> {
+    fn finish(mut self) -> Result<(usize, usize), String> {
         self.output
             .write_all(&self.end_marker)
             .map_err(|error| format!("failed to write sequential SBDF end marker: {error}"))?;
@@ -1906,7 +1922,8 @@ impl SequentialDirectSbdfWriter {
                 self.target.display(),
                 partial.display()
             )
-        })
+        })?;
+        Ok((self.row_count, self.slice_count))
     }
 }
 
@@ -2037,6 +2054,7 @@ impl Write for PositionalFileSink<'_> {
 struct EncodedBufferResult {
     sequence: usize,
     row_count: usize,
+    slice_count: usize,
     bytes: Vec<u8>,
     schema_checksum: u64,
 }
@@ -2120,6 +2138,8 @@ struct DirectSbdfAssembler {
     end_marker: Vec<u8>,
     next_offset: u64,
     schema_checksum: u64,
+    row_count: usize,
+    slice_count: usize,
 }
 
 #[cfg(any(test, feature = "planned-offset-prototype"))]
@@ -2168,6 +2188,8 @@ impl DirectSbdfAssembler {
             end_marker,
             next_offset,
             schema_checksum: config.fingerprint(),
+            row_count: 0,
+            slice_count: 0,
         })
     }
 
@@ -2195,6 +2217,8 @@ impl DirectSbdfAssembler {
             offset
         )
         .map_err(|error| format!("failed to update direct-write manifest: {error}"))?;
+        self.row_count = self.row_count.saturating_add(result.row_count);
+        self.slice_count = self.slice_count.saturating_add(result.slice_count);
         Ok(offset)
     }
 
@@ -2225,14 +2249,17 @@ impl DirectSbdfAssembler {
             result.schema_checksum,
             result.offset
         )
-        .map_err(|error| format!("failed to update direct-write manifest: {error}"))
+        .map_err(|error| format!("failed to update direct-write manifest: {error}"))?;
+        self.row_count = self.row_count.saturating_add(result.row_count);
+        self.slice_count = self.slice_count.saturating_add(result.slice_count);
+        Ok(())
     }
 
-    fn finish(self) -> Result<(), String> {
+    fn finish(self) -> Result<(usize, usize), String> {
         self.finish_with_sync(true)
     }
 
-    fn finish_with_sync(mut self, sync_output: bool) -> Result<(), String> {
+    fn finish_with_sync(mut self, sync_output: bool) -> Result<(usize, usize), String> {
         write_all_at(&self.file, &self.end_marker, self.next_offset)?;
         let final_len = self
             .next_offset
@@ -2257,7 +2284,8 @@ impl DirectSbdfAssembler {
                 self.target.display(),
                 partial.display()
             )
-        })
+        })?;
+        Ok((self.row_count, self.slice_count))
     }
 }
 
@@ -2265,6 +2293,7 @@ fn complete_fragment(
     sequence: usize,
     partial: PathBuf,
     row_count: usize,
+    slice_count: usize,
     schema_checksum: u64,
 ) -> Result<FragmentResult, String> {
     let ready = partial.with_extension("ready");
@@ -2289,6 +2318,7 @@ fn complete_fragment(
         sequence,
         path: ready,
         row_count,
+        slice_count,
         byte_len,
         schema_checksum,
     })
@@ -2319,6 +2349,7 @@ struct PlannedBatchResult {
 struct PlannedWriteResult {
     sequence: usize,
     row_count: usize,
+    slice_count: usize,
     byte_len: usize,
     checksum: u64,
     schema_checksum: u64,
@@ -2355,6 +2386,7 @@ fn encode_parquet_row_group_fragment(
             .writer(&partial, false)
             .map_err(|error| error.to_string())?;
         let mut row_count = 0usize;
+        let mut slice_count = 0usize;
         for batch in reader {
             let batch = batch.map_err(|error| {
                 format!(
@@ -2365,6 +2397,9 @@ fn encode_parquet_row_group_fragment(
             })?;
             row_count = row_count.saturating_add(batch.num_rows());
             write_record_batch_to_sbdf(&mut writer, &batch).map_err(|error| error.to_string())?;
+            if batch.num_rows() > 0 {
+                slice_count = slice_count.saturating_add(1);
+            }
         }
         if row_count != task.expected_rows {
             return Err(format!(
@@ -2375,7 +2410,13 @@ fn encode_parquet_row_group_fragment(
             ));
         }
         writer.finish(false).map_err(|error| error.to_string())?;
-        complete_fragment(sequence, partial.clone(), row_count, config.fingerprint())
+        complete_fragment(
+            sequence,
+            partial.clone(),
+            row_count,
+            slice_count,
+            config.fingerprint(),
+        )
     })();
     if result.is_err() {
         let _ = fs::remove_file(&partial);
@@ -2410,6 +2451,7 @@ fn encode_parquet_row_group_buffer(
         })?;
     let mut bytes = Vec::new();
     let mut row_count = 0usize;
+    let mut slice_count = 0usize;
     for batch in reader {
         let batch = batch.map_err(|error| {
             format!(
@@ -2419,6 +2461,9 @@ fn encode_parquet_row_group_buffer(
             )
         })?;
         row_count = row_count.saturating_add(batch.num_rows());
+        if batch.num_rows() > 0 {
+            slice_count = slice_count.saturating_add(1);
+        }
         encode_record_batch_into(
             &mut bytes,
             &config.columns,
@@ -2439,6 +2484,7 @@ fn encode_parquet_row_group_buffer(
     Ok(EncodedBufferResult {
         sequence,
         row_count,
+        slice_count,
         bytes,
         schema_checksum: config.fingerprint(),
     })
@@ -3022,6 +3068,7 @@ where
                     }
                     match assignment_receiver.recv() {
                         Ok(PlannedAssignment::Write(offset, result)) => {
+                            let slice_count = result.batches.len();
                             let mut sink =
                                 PositionalFileSink::new(&output, offset, result.byte_len);
                             let encode_result = result
@@ -3049,6 +3096,7 @@ where
                                 .send(PlannedParallelEvent::Written(PlannedWriteResult {
                                     sequence: result.sequence,
                                     row_count: result.row_count,
+                                    slice_count,
                                     byte_len: written,
                                     checksum,
                                     schema_checksum: result.schema_checksum,
@@ -3286,7 +3334,7 @@ fn decode_native_csv_to_writer<R: Read>(
     batch_size: usize,
     delimiter: u8,
     has_header: bool,
-) -> Result<(usize, usize), String> {
+) -> Result<(usize, usize, usize), String> {
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(delimiter)
         .has_headers(has_header)
@@ -3296,6 +3344,7 @@ fn decode_native_csv_to_writer<R: Read>(
     let mut batch = native_csv::NativeCsvBatch::new(column_types.to_vec(), batch_size);
     let mut total_rows = 0usize;
     let mut total_decoded_bytes = 0usize;
+    let mut slice_count = 0usize;
 
     loop {
         let has_record = reader
@@ -3313,6 +3362,7 @@ fn decode_native_csv_to_writer<R: Read>(
             total_rows = total_rows.saturating_add(batch.rows());
             total_decoded_bytes = total_decoded_bytes.saturating_add(batch.decoded_bytes());
             write_native_csv_batch_to_sbdf(writer, &batch).map_err(|error| error.to_string())?;
+            slice_count = slice_count.saturating_add(1);
             batch.clear_retain_capacity();
         }
     }
@@ -3321,8 +3371,9 @@ fn decode_native_csv_to_writer<R: Read>(
         total_rows = total_rows.saturating_add(batch.rows());
         total_decoded_bytes = total_decoded_bytes.saturating_add(batch.decoded_bytes());
         write_native_csv_batch_to_sbdf(writer, &batch).map_err(|error| error.to_string())?;
+        slice_count = slice_count.saturating_add(1);
     }
-    Ok((total_rows, total_decoded_bytes))
+    Ok((total_rows, total_decoded_bytes, slice_count))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3446,7 +3497,7 @@ fn decode_arrow_csv_to_writer<R: Read>(
     batch_size: usize,
     delimiter: u8,
     has_header: bool,
-) -> Result<(usize, usize), String> {
+) -> Result<(usize, usize, usize), String> {
     let format = CsvFormat::default()
         .with_header(has_header)
         .with_delimiter(delimiter);
@@ -3457,6 +3508,7 @@ fn decode_arrow_csv_to_writer<R: Read>(
         .map_err(|error| format!("failed to create CSV reader for '{source_name}': {error}"))?;
     let mut total_rows = 0usize;
     let mut total_decoded_bytes = 0usize;
+    let mut slice_count = 0usize;
     for batch in reader {
         let batch = batch.map_err(|error| {
             format!("failed to decode CSV record batch from '{source_name}': {error}")
@@ -3470,8 +3522,11 @@ fn decode_arrow_csv_to_writer<R: Read>(
                 .sum::<usize>(),
         );
         write_record_batch_to_sbdf(writer, &batch).map_err(|error| error.to_string())?;
+        if batch.num_rows() > 0 {
+            slice_count = slice_count.saturating_add(1);
+        }
     }
-    Ok((total_rows, total_decoded_bytes))
+    Ok((total_rows, total_decoded_bytes, slice_count))
 }
 
 fn parse_utf8_csv_primitive<T>(column: &dyn Array, column_name: &str) -> Result<ArrayRef, String>
@@ -3641,7 +3696,7 @@ fn csv_mmap_parallel_to_sbdf(
     schema: Arc<Schema>,
     use_native_buffers: bool,
     config: &SbdfEncodingConfig,
-) -> Result<(), String> {
+) -> Result<(usize, usize), String> {
     let input = File::open(csv_path)
         .map_err(|error| format!("failed to reopen CSV file '{csv_path}': {error}"))?;
     let mmap = unsafe { MmapOptions::new().map(&input) }
@@ -3680,7 +3735,7 @@ fn csv_mmap_parallel_to_sbdf(
                 .writer(&partial, false)
                 .map_err(|error| error.to_string())?;
             let source_span = format!("'{source_path}' bytes {start}..{end}");
-            let (row_count, decoded_bytes) = if use_native_buffers {
+            let (row_count, decoded_bytes, slice_count) = if use_native_buffers {
                 decode_native_csv_to_writer(
                     &encode_mmap.as_ref()[start..end],
                     &source_span,
@@ -3723,6 +3778,7 @@ fn csv_mmap_parallel_to_sbdf(
                 sequence,
                 partial.clone(),
                 row_count,
+                slice_count,
                 encode_config.fingerprint(),
             )
         })();
@@ -3746,7 +3802,7 @@ fn csv_to_sbdf_streaming_impl(
     encoding_rle: bool,
     adaptive_encoding: bool,
     workers: usize,
-) -> PyResult<()> {
+) -> PyResult<(usize, Vec<usize>, usize, usize)> {
     if batch_size == 0 {
         return Err(PyValueError::new_err(
             "batch_size must be greater than zero",
@@ -3807,7 +3863,9 @@ fn csv_to_sbdf_streaming_impl(
             use_native_buffers,
             &config,
         ) {
-            Ok(()) => return Ok(()),
+            Ok((row_count, slice_count)) => {
+                return Ok((workers, vec![batch_size], row_count, slice_count));
+            }
             Err(error) if error.starts_with("failed to mmap CSV file") => {
                 // Mapping is an optimization. Preserve the bounded sequential path when the
                 // platform or input cannot be memory mapped.
@@ -3844,8 +3902,8 @@ fn csv_to_sbdf_streaming_impl(
     }
     .map_err(PyRuntimeError::new_err)?;
 
-    writer.finish().map_err(PyRuntimeError::new_err)?;
-    Ok(())
+    let (row_count, slice_count) = writer.finish().map_err(PyRuntimeError::new_err)?;
+    Ok((1, vec![batch_size], row_count, slice_count))
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -3858,7 +3916,7 @@ fn parquet_files_to_sbdf_streaming_impl(
     adaptive_encoding: bool,
     workers: usize,
     adaptive_workers: bool,
-) -> PyResult<()> {
+) -> PyResult<(usize, Vec<usize>, usize, usize)> {
     if batch_size == 0 {
         return Err(PyValueError::new_err(
             "batch_size must be greater than zero",
@@ -3930,6 +3988,7 @@ fn parquet_files_to_sbdf_streaming_impl(
     } else {
         workers
     };
+    let effective_batch_sizes = plans.iter().map(|plan| plan.batch_size).collect::<Vec<_>>();
 
     if effective_workers > 1 {
         #[cfg(feature = "planned-offset-prototype")]
@@ -3980,9 +4039,15 @@ fn parquet_files_to_sbdf_streaming_impl(
                 )
                 .map_err(PyRuntimeError::new_err)?;
             }
-            return assembler
+            let (row_count, slice_count) = assembler
                 .finish_with_sync(false)
-                .map_err(PyRuntimeError::new_err);
+                .map_err(PyRuntimeError::new_err)?;
+            return Ok((
+                effective_workers,
+                effective_batch_sizes,
+                row_count,
+                slice_count,
+            ));
         }
 
         #[cfg(not(feature = "planned-offset-prototype"))]
@@ -4032,7 +4097,13 @@ fn parquet_files_to_sbdf_streaming_impl(
                 )
                 .map_err(PyRuntimeError::new_err)?;
             }
-            return assembler.finish().map_err(PyRuntimeError::new_err);
+            let (row_count, slice_count) = assembler.finish().map_err(PyRuntimeError::new_err)?;
+            return Ok((
+                effective_workers,
+                effective_batch_sizes,
+                row_count,
+                slice_count,
+            ));
         }
     }
 
@@ -4074,7 +4145,13 @@ fn parquet_files_to_sbdf_streaming_impl(
             )
             .map_err(PyRuntimeError::new_err)?;
         }
-        writer.finish().map_err(PyRuntimeError::new_err)
+        let (row_count, slice_count) = writer.finish().map_err(PyRuntimeError::new_err)?;
+        Ok((
+            effective_workers,
+            effective_batch_sizes,
+            row_count,
+            slice_count,
+        ))
     }
 
     #[cfg(not(feature = "planned-offset-prototype"))]
@@ -4094,6 +4171,8 @@ fn parquet_files_to_sbdf_streaming_impl(
             adaptive_encoding,
         )?;
 
+        let mut row_count = 0usize;
+        let mut slice_count = 0usize;
         for plan in plans {
             let parquet_path = plan.source_path.to_string_lossy().into_owned();
             let prefetch = should_prefetch_parquet_batch(plan.batch_size, plan.metadata.metadata());
@@ -4120,6 +4199,10 @@ fn parquet_files_to_sbdf_streaming_impl(
                     })
                 }),
                 |batch| {
+                    row_count = row_count.saturating_add(batch.num_rows());
+                    if batch.num_rows() > 0 {
+                        slice_count = slice_count.saturating_add(1);
+                    }
                     write_record_batch_to_sbdf(&mut writer, &batch).map_err(|error| {
                         format!("failed while writing SBDF data from '{parquet_path}': {error}")
                     })
@@ -4130,7 +4213,12 @@ fn parquet_files_to_sbdf_streaming_impl(
         }
 
         writer.close()?;
-        Ok(())
+        Ok((
+            effective_workers,
+            effective_batch_sizes,
+            row_count,
+            slice_count,
+        ))
     }
 }
 
@@ -4146,7 +4234,7 @@ fn parquet_to_sbdf_streaming(
     adaptive_encoding: bool,
     workers: usize,
     adaptive_workers: bool,
-) -> PyResult<()> {
+) -> PyResult<(usize, Vec<usize>, usize, usize)> {
     parquet_files_to_sbdf_streaming_impl(
         vec![parquet_path],
         sbdf_path,
@@ -4171,7 +4259,7 @@ fn parquet_files_to_sbdf_streaming(
     adaptive_encoding: bool,
     workers: usize,
     adaptive_workers: bool,
-) -> PyResult<()> {
+) -> PyResult<(usize, Vec<usize>, usize, usize)> {
     parquet_files_to_sbdf_streaming_impl(
         parquet_files,
         sbdf_path,
@@ -4198,7 +4286,7 @@ fn csv_to_sbdf_streaming(
     encoding_rle: bool,
     adaptive_encoding: bool,
     workers: usize,
-) -> PyResult<()> {
+) -> PyResult<(usize, Vec<usize>, usize, usize)> {
     csv_to_sbdf_streaming_impl(
         csv_path,
         sbdf_path,
@@ -4595,7 +4683,7 @@ mod tests {
     use parquet::file::properties::WriterProperties;
     use std::collections::HashMap;
     use std::fs::{self, File};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::sync::mpsc::{channel, TryRecvError};
     use std::sync::Arc;
     use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -4880,6 +4968,68 @@ mod tests {
     }
 
     #[test]
+    fn parquet_conversion_reports_file_specific_batch_caps_in_input_order() {
+        let directory = TestDirectory::create("file-specific-batch-caps");
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, false),
+            Field::new("payload", DataType::Utf8, false),
+        ]));
+        let narrow_path = directory.0.join("narrow.parquet");
+        let wide_path = directory.0.join("wide.parquet");
+        let write_parquet = |path: &Path, values: Vec<String>| {
+            let batch = RecordBatch::try_new(
+                Arc::clone(&schema),
+                vec![
+                    Arc::new(Int64Array::from(vec![1, 2, 3, 4])),
+                    Arc::new(StringArray::from(values)),
+                ],
+            )
+            .unwrap();
+            let mut writer =
+                ArrowWriter::try_new(File::create(path).unwrap(), Arc::clone(&schema), None)
+                    .unwrap();
+            writer.write(&batch).unwrap();
+            writer.close().unwrap();
+        };
+        write_parquet(
+            &narrow_path,
+            ["a", "b", "c", "d"]
+                .into_iter()
+                .map(str::to_string)
+                .collect(),
+        );
+        write_parquet(
+            &wide_path,
+            (0..4)
+                .map(|index| format!("{index}{}", "x".repeat(256 * 1024)))
+                .collect(),
+        );
+
+        let output = directory.0.join("output.sbdf");
+        let stats = parquet_files_to_sbdf_streaming_impl(
+            vec![
+                narrow_path.to_string_lossy().into_owned(),
+                wide_path.to_string_lossy().into_owned(),
+            ],
+            output.to_string_lossy().into_owned(),
+            5_000,
+            None,
+            true,
+            false,
+            1,
+            false,
+        )
+        .unwrap();
+
+        assert_eq!(stats.0, 1);
+        assert_eq!(stats.1.len(), 2);
+        assert_eq!(stats.1[0], 5_000);
+        assert!(stats.1[1] < stats.1[0]);
+        assert_eq!(stats.2, 8);
+        assert_eq!(stats.3, 2);
+    }
+
+    #[test]
     fn adaptive_parquet_workers_follow_profiled_shape_boundaries() {
         let mebibyte = 1024 * 1024;
 
@@ -5044,6 +5194,7 @@ mod tests {
             Ok(EncodedBufferResult {
                 sequence: task.sequence,
                 row_count: task.payload.num_rows(),
+                slice_count: usize::from(task.payload.num_rows() > 0),
                 bytes,
                 schema_checksum: encode_config.fingerprint(),
             })

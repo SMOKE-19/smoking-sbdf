@@ -21,10 +21,7 @@ AGENTS.md
 
 # Local development and internal project records.
 tests/
-docs/
 examples/
-USAGE.md
-build.md
 
 # Local conversion, benchmark, and interrupted-publish artifacts.
 *.sbdf
