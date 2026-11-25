@@ -1,17 +1,17 @@
 # `smoking-sbdf`
 
-`smoking-sbdf`는 CSV, Parquet, Parquet dataset과 Python DataFrame을 Spotfire SBDF 1.0 파일로 변환하는 Rust 기반 Python 패키지다.
+`smoking-sbdf`는 Spotfire SBDF 1.0과 Parquet를 변환하는 Rust 기반 Python 패키지다. CSV, Parquet dataset, Python DataFrame도 SBDF로 내보낼 수 있다.
 
 - 배포 패키지: `smoking-sbdf`
 - Python import: `smoking_sbdf`
 - CLI: `smoking-sbdf`
-- 제공 wheel: CPython 3.10–3.14, Linux x86_64·Windows x86_64
+- 지원 Python: CPython 3.10–3.14
 
 ## 프로젝트 상태
 
 개인 사용을 위해 만든 구현과 빌드 결과를 `as-is`로 공개한
 스냅샷이다. PyPI 게시, 정기 릴리스, 호환성 보장, 기능 로드맵과
-사용자 지원을 운영하지 않는다. 현재 코드와 `v0.1.6` 산출물은
+사용자 지원을 운영하지 않는다. 코드와 릴리스 산출물은
 필요한 범위에서 자유롭게 포크·수정해 사용할 수 있다.
 
 ## 제공 기능
@@ -19,6 +19,7 @@
 - Rust 단독 SBDF header·metadata·table slice·end marker 직렬화
 - CSV schema 추론과 bounded streaming 변환
 - Parquet 파일·파일 목록·dataset·manifest 변환
+- SBDF 파일을 슬라이스 단위로 읽어 Parquet로 변환
 - pandas·Polars DataFrame 함수 API와 `DataFrame.to_sbdf()`
 - 단일 worker direct writer와 명시적 병렬 worker
 - Parquet metadata 기반 adaptive worker 선택
@@ -31,11 +32,11 @@ vendored C writer와 C FFI는 사용하지 않는다. Python은 경로와 DataFr
 ## 빠른 시작
 
 사용 중인 CPython 버전과 플랫폼에 맞는 wheel을
-[`v0.1.6` GitHub Release](https://github.com/SMOKE-19/smoking-sbdf/releases/tag/v0.1.6)에서
+[GitHub Releases](https://github.com/SMOKE-19/smoking-sbdf/releases)에서
 다운로드한 뒤 설치한다.
 
 ```bash
-python -m pip install ./smoking_sbdf-0.1.6-<python-tag>-<platform-tag>.whl
+python -m pip install ./smoking_sbdf-0.1.7-<python-tag>-<platform-tag>.whl
 ```
 
 예를 들어 CPython 3.14 Linux x86_64에서는 `cp314`·`manylinux` wheel을
@@ -53,10 +54,13 @@ CLI도 같은 변환 규칙을 사용한다.
 
 ```bash
 smoking-sbdf convert input.csv output.sbdf
+smoking-sbdf to-parquet input.sbdf output.parquet
 smoking-sbdf -help
 ```
 
 `-help`, `--help`, `-h`는 같은 도움말을 출력한다. `-help`는 LLM이나 자동화 도구가 단일 대시 형태로 요청해도 실패하지 않도록 제공하는 호환 별칭이다.
+
+SBDF를 읽는 Python API와 지원 타입은 [SBDF를 Parquet로 변환하기](USAGE.md#sbdf를-parquet로-변환하기)에 정리되어 있다.
 
 ## 병렬 worker 설정
 

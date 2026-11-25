@@ -1,4 +1,4 @@
-"""Rust-backed SBDF writers for Parquet, CSV, and Python DataFrames."""
+"""Rust-backed conversions between Spotfire SBDF and Parquet, CSV, or DataFrames."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta, timezone
 from importlib import import_module
 from importlib.util import find_spec
+import json
 import math
 from pathlib import Path
 from typing import Literal
@@ -15,10 +16,13 @@ from ._native import (
     SBDFError,
     StreamingSbdfWriter,
     csv_to_sbdf_streaming as _csv_to_sbdf_streaming,
+    decode_sbdf_to_ipc as _decode_sbdf_to_ipc,
     generate_sbdf_sidecar as _generate_sbdf_sidecar,
     parquet_files_to_sbdf_streaming as _parquet_files_to_sbdf_streaming,
     parquet_to_sbdf_streaming as _parquet_to_sbdf_streaming,
+    plan_sbdf_ranges as _plan_sbdf_ranges,
     resolve_dataframe_column_types as _resolve_dataframe_column_types,
+    sbdf_to_parquet_streaming as _sbdf_to_parquet_streaming,
 )
 
 InputFormat = Literal[
@@ -119,6 +123,46 @@ def generate_sbdf_sidecar(
         keys,
     )
     return resolved_sidecar_path
+
+
+def plan_sbdf_ranges(
+    *,
+    preamble_bytes: int,
+    end_marker_offset: int,
+    file_size: int,
+    slices: Sequence[dict[str, int]],
+    merge_gap_bytes: int = 64 * 1024,
+    max_range_bytes: int = 8 * 1024 * 1024,
+) -> dict[str, object]:
+    """Validate SBDF slice coordinates and return bounded remote byte ranges."""
+    request = {
+        "preamble_bytes": preamble_bytes,
+        "end_marker_offset": end_marker_offset,
+        "file_size": file_size,
+        "slices": list(slices),
+        "merge_gap_bytes": merge_gap_bytes,
+        "max_range_bytes": max_range_bytes,
+    }
+    return json.loads(_plan_sbdf_ranges(json.dumps(request, ensure_ascii=True)))
+
+
+def decode_sbdf_to_ipc(sbdf_path: str | Path, output_ipc_path: str | Path) -> dict[str, object]:
+    """Decode a locally available SBDF stream into an Arrow IPC file."""
+    return json.loads(_decode_sbdf_to_ipc(str(Path(sbdf_path)), str(Path(output_ipc_path))))
+
+
+def sbdf_to_parquet_streaming(
+    sbdf_path: str | Path, parquet_path: str | Path
+) -> Path:
+    """Convert one Spotfire SBDF file to Parquet and return the output path."""
+    source = Path(sbdf_path)
+    output = Path(parquet_path)
+    if source.resolve() == output.resolve() or (
+        source.is_file() and output.exists() and source.samefile(output)
+    ):
+        raise ValueError("parquet_path must differ from sbdf_path")
+    _sbdf_to_parquet_streaming(str(source), str(output))
+    return output
 
 
 def _generate_requested_sidecar(
@@ -878,11 +922,13 @@ __all__ = [
     "csv_to_sbdf_streaming",
     "dataframe_to_sbdf",
     "generate_sbdf_sidecar",
+    "plan_sbdf_ranges",
     "install_dataframe_methods",
     "parquet_dataset_to_sbdf_streaming",
     "parquet_files_to_sbdf_streaming",
     "parquet_manifest_to_sbdf_streaming",
     "parquet_to_sbdf_streaming",
+    "sbdf_to_parquet_streaming",
     "register_dataframe_type",
     "sbdf_sidecar_path",
     "to_sbdf",

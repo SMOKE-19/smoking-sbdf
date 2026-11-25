@@ -1,12 +1,12 @@
 # `smoking-sbdf` 사용법
 
-이 문서는 Python을 처음 사용하는 사람도 CSV나 Parquet 파일을 SBDF로 변환할 수
-있도록 기본 개념부터 설명한다. 패키지 이름은 `smoking-sbdf`, Python에서 불러올
+이 문서는 CSV·Parquet에서 SBDF를 만드는 방법과 SBDF를 Parquet로 읽는 방법을 설명한다.
+패키지 이름은 `smoking-sbdf`, Python에서 불러올
 이름은 `smoking_sbdf`, 터미널 명령어는 `smoking-sbdf`다.
 
 ## 먼저 알아둘 것
 
-- 입력 파일은 그대로 두고 새 SBDF 파일을 만든다.
+- 입력 파일을 보존하고 별도 경로에 변환 결과를 저장한다.
 - 출력 경로의 상위 디렉터리가 없으면 자동으로 만든다.
 - 일반 변환 결과는 `pathlib.Path` 객체다.
 - PyPI에는 게시하지 않는다. GitHub Release에서 운영체제와 Python 버전에 맞는
@@ -24,7 +24,7 @@ CPython 3.10–3.14를 지원한다. GitHub Release에서 받은 wheel 파일이
 디렉터리에 있다면 다음처럼 설치한다.
 
 ```bash
-python -m pip install ./smoking_sbdf-0.1.6-<python-tag>-<platform-tag>.whl
+python -m pip install ./smoking_sbdf-0.1.7-<python-tag>-<platform-tag>.whl
 ```
 
 파일 이름에 `cp313`이 있으면 CPython 3.13용이다. `manylinux`는 Linux,
@@ -142,6 +142,27 @@ smoking-sbdf convert --help
 
 `-help`도 같은 의미로 사용할 수 있다. 성공하면 출력 경로를 표시하고 종료 코드
 `0`을 반환한다. 입력이나 옵션이 잘못되면 오류를 표시하고 종료 코드 `2`를 반환한다.
+
+## SBDF를 Parquet로 변환하기
+
+```bash
+smoking-sbdf to-parquet input.sbdf output.parquet
+smoking-sbdf to-parquet --help
+```
+
+```python
+from smoking_sbdf import sbdf_to_parquet_streaming
+
+output = sbdf_to_parquet_streaming("input.sbdf", "output.parquet")
+```
+
+SBDF 파일 하나를 슬라이스 단위로 읽고 Snappy 압축 Parquet에 기록한다. 행·열 순서, 중복 행,
+`IsInvalid`로 표시된 NULL을 보존한다. DateTime은 타임존이 없는 밀리초 timestamp, Date는 DATE,
+Time은 밀리초 TIME이다. TimeSpan은 Arrow에서 밀리초 duration이며 Parquet 물리 타입은 INT64다.
+Decimal 열이 있으면 해당 값의 정밀도와 소수 자릿수를 먼저 확인해 Parquet DECIMAL로 기록한다.
+76자리를 넘는 정밀도, Decimal NaN·무한대, 열이 없는 테이블은 오류로 처리한다.
+SBDF 표시 서식 등의 메타데이터는 출력에 포함되지 않는다.
+정상 변환이 끝나면 출력 경로의 기존 파일을 교체한다. 실패하면 기존 출력을 보존한다.
 
 ## 여러 Parquet 파일 처리하기
 

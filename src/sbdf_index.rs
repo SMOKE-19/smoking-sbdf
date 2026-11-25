@@ -1,14 +1,19 @@
 use arrow_array::{
-    ArrayRef, BinaryArray, BooleanArray, Float32Array, Float64Array, Int32Array, Int64Array,
-    RecordBatch, StringArray,
+    ArrayRef, BinaryArray, BooleanArray, Date32Array, Decimal128Array, Decimal256Array,
+    DurationMillisecondArray, Float32Array, Float64Array, Int32Array, Int64Array, RecordBatch,
+    StringArray, Time32MillisecondArray, TimestampMillisecondArray,
 };
-use arrow_schema::{DataType, Field, Schema, SchemaRef};
+use arrow_buffer::i256;
+use arrow_ipc::writer::FileWriter;
+use arrow_schema::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression;
 use parquet::file::properties::{EnabledStatistics, WriterProperties};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
-use std::io::{BufReader, Read, Seek};
+use std::io::{BufReader, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -22,7 +27,175 @@ const TABLE_END: u8 = 0x05;
 const PLAIN: u8 = 0x01;
 const RLE: u8 = 0x02;
 const BITS: u8 = 0x03;
+const DECIMAL: u8 = 0x0d;
 const END_MARKER_BYTES: u64 = 3;
+
+#[derive(Deserialize)]
+struct RangePlanRequest {
+    preamble_bytes: u64,
+    end_marker_offset: u64,
+    file_size: u64,
+    slices: Vec<SliceCoordinate>,
+    #[serde(default = "default_merge_gap")]
+    merge_gap_bytes: u64,
+    #[serde(default = "default_max_range")]
+    max_range_bytes: u64,
+}
+
+#[derive(Clone, Deserialize)]
+struct SliceCoordinate {
+    slice_id: i64,
+    byte_offset: u64,
+    byte_length: u64,
+}
+
+#[derive(Clone, Serialize)]
+struct LogicalRange {
+    role: &'static str,
+    slice_id: Option<i64>,
+    start: u64,
+    end_exclusive: u64,
+}
+
+#[derive(Serialize)]
+struct FetchRange {
+    start: u64,
+    end_exclusive: u64,
+    byte_length: u64,
+    roles: Vec<&'static str>,
+    slice_ids: Vec<i64>,
+}
+
+#[derive(Serialize)]
+struct RangePlanDocument {
+    schema_version: &'static str,
+    file_size: u64,
+    requested_slice_count: usize,
+    logical_ranges: Vec<LogicalRange>,
+    fetch_ranges: Vec<FetchRange>,
+    requested_bytes: u64,
+    merged_fetch_bytes: u64,
+}
+
+fn default_merge_gap() -> u64 {
+    64 * 1024
+}
+
+fn default_max_range() -> u64 {
+    8 * 1024 * 1024
+}
+
+pub(crate) fn plan_ranges_json(request_json: &str) -> Result<String, String> {
+    let request: RangePlanRequest = serde_json::from_str(request_json)
+        .map_err(|error| format!("invalid SBDF range plan request: {error}"))?;
+    if request.preamble_bytes == 0 || request.preamble_bytes > request.end_marker_offset {
+        return Err("SBDF preamble range is invalid".to_string());
+    }
+    if request.end_marker_offset >= request.file_size {
+        return Err("SBDF end marker range is invalid".to_string());
+    }
+    if request.file_size - request.end_marker_offset != END_MARKER_BYTES {
+        return Err("SBDF end marker must occupy the final three bytes".to_string());
+    }
+    if request.max_range_bytes == 0 {
+        return Err("max_range_bytes must be positive".to_string());
+    }
+    let mut unique = BTreeMap::<i64, SliceCoordinate>::new();
+    for slice in request.slices {
+        let end = slice
+            .byte_offset
+            .checked_add(slice.byte_length)
+            .ok_or_else(|| "SBDF slice range overflows u64".to_string())?;
+        if slice.byte_length == 0
+            || slice.byte_offset < request.preamble_bytes
+            || end > request.end_marker_offset
+        {
+            return Err(format!(
+                "SBDF slice {} is outside the data section",
+                slice.slice_id
+            ));
+        }
+        if let Some(previous) = unique.get(&slice.slice_id) {
+            if previous.byte_offset != slice.byte_offset
+                || previous.byte_length != slice.byte_length
+            {
+                return Err(format!(
+                    "SBDF slice {} has conflicting coordinates",
+                    slice.slice_id
+                ));
+            }
+        } else {
+            unique.insert(slice.slice_id, slice);
+        }
+    }
+    let mut ordered = unique.into_values().collect::<Vec<_>>();
+    ordered.sort_by_key(|slice| (slice.byte_offset, slice.slice_id));
+    for pair in ordered.windows(2) {
+        let previous_end = pair[0].byte_offset + pair[0].byte_length;
+        if pair[1].byte_offset < previous_end {
+            return Err("SBDF selected slice ranges overlap".to_string());
+        }
+    }
+    let mut logical = Vec::with_capacity(ordered.len() + 2);
+    logical.push(LogicalRange {
+        role: "preamble",
+        slice_id: None,
+        start: 0,
+        end_exclusive: request.preamble_bytes,
+    });
+    logical.extend(ordered.iter().map(|slice| LogicalRange {
+        role: "slice",
+        slice_id: Some(slice.slice_id),
+        start: slice.byte_offset,
+        end_exclusive: slice.byte_offset + slice.byte_length,
+    }));
+    logical.push(LogicalRange {
+        role: "end_marker",
+        slice_id: None,
+        start: request.end_marker_offset,
+        end_exclusive: request.file_size,
+    });
+    let requested_bytes = logical
+        .iter()
+        .map(|range| range.end_exclusive - range.start)
+        .sum();
+    let mut fetches: Vec<FetchRange> = Vec::new();
+    for range in &logical {
+        if let Some(last) = fetches.last_mut() {
+            let gap = range.start.saturating_sub(last.end_exclusive);
+            let merged_length = range.end_exclusive.saturating_sub(last.start);
+            if gap <= request.merge_gap_bytes && merged_length <= request.max_range_bytes {
+                last.end_exclusive = range.end_exclusive;
+                last.byte_length = merged_length;
+                if !last.roles.contains(&range.role) {
+                    last.roles.push(range.role);
+                }
+                if let Some(slice_id) = range.slice_id {
+                    last.slice_ids.push(slice_id);
+                }
+                continue;
+            }
+        }
+        fetches.push(FetchRange {
+            start: range.start,
+            end_exclusive: range.end_exclusive,
+            byte_length: range.end_exclusive - range.start,
+            roles: vec![range.role],
+            slice_ids: range.slice_id.into_iter().collect(),
+        });
+    }
+    let merged_fetch_bytes = fetches.iter().map(|range| range.byte_length).sum();
+    serde_json::to_string(&RangePlanDocument {
+        schema_version: "smoking-sbdf.range-plan.v1",
+        file_size: request.file_size,
+        requested_slice_count: ordered.len(),
+        logical_ranges: logical,
+        fetch_ranges: fetches,
+        requested_bytes,
+        merged_fetch_bytes,
+    })
+    .map_err(|error| error.to_string())
+}
 
 const TABLE_ID_COLUMN: &str = "__sbdf_table_id";
 const FILE_COLUMN: &str = "__sbdf_file";
@@ -62,9 +235,11 @@ enum ScalarValue {
     Float64(f64),
     String(String),
     Binary(Vec<u8>),
+    Decimal(u128),
 }
 
 struct DecodedArray {
+    type_id: u8,
     count: usize,
     values: Option<Vec<Option<ScalarValue>>>,
 }
@@ -506,6 +681,409 @@ fn values_to_array(
     Ok(array)
 }
 
+pub(crate) fn decode_to_ipc(
+    sbdf_path: &Path,
+    output_path: &Path,
+) -> Result<(usize, usize), String> {
+    let (mut input, table) = open_table(sbdf_path)?;
+    let schema = decode_schema(&table, None)?;
+    let workspace = crate::TempWorkspace::create(output_path)?;
+    let partial = workspace.path.join("output.arrow");
+    let output = File::create(&partial).map_err(|error| error.to_string())?;
+    let mut writer = FileWriter::try_new(output, &schema)
+        .map_err(|error| format!("failed to initialize SBDF IPC writer: {error}"))?;
+    let counts = decode_batches(&mut input, &table, &schema, |batch| {
+        writer.write(batch).map_err(|error| error.to_string())
+    })?;
+    writer.finish().map_err(|error| error.to_string())?;
+    drop(writer);
+    drop(input);
+    publish_decoded(&partial, output_path)?;
+    Ok(counts)
+}
+
+pub(crate) fn decode_to_parquet(sbdf_path: &Path, output_path: &Path) -> Result<(), String> {
+    let (mut input, table) = open_table(sbdf_path)?;
+    let decimals = infer_decimal_types(&mut input, &table)?;
+    let schema = decode_schema(&table, Some(&decimals))?;
+    if schema.fields().is_empty() {
+        return Err("cannot write a Parquet file with no columns".to_string());
+    }
+    let workspace = crate::TempWorkspace::create(output_path)?;
+    let partial = workspace.path.join("output.parquet");
+    let output = File::create(&partial).map_err(|error| error.to_string())?;
+    let properties = WriterProperties::builder()
+        .set_compression(Compression::SNAPPY)
+        .set_max_row_group_row_count(Some(65_536))
+        .set_max_row_group_bytes(Some(64 * 1024 * 1024))
+        .build();
+    let mut writer = ArrowWriter::try_new(output, Arc::clone(&schema), Some(properties))
+        .map_err(|error| format!("failed to initialize Parquet writer: {error}"))?;
+    decode_batches(&mut input, &table, &schema, |batch| {
+        writer.write(batch).map_err(|error| error.to_string())
+    })?;
+    writer.close().map_err(|error| error.to_string())?;
+    drop(input);
+    publish_decoded(&partial, output_path)
+}
+
+fn publish_decoded(partial: &Path, output_path: &Path) -> Result<(), String> {
+    fs::rename(partial, output_path).map_err(|error| {
+        format!(
+            "failed to publish decoded output '{}': {error}",
+            output_path.display()
+        )
+    })
+}
+
+fn open_table(sbdf_path: &Path) -> Result<(BufReader<File>, TableSchema), String> {
+    let input = File::open(sbdf_path).map_err(|error| {
+        format!(
+            "failed to open SBDF file '{}': {error}",
+            sbdf_path.display()
+        )
+    })?;
+    let mut input = BufReader::new(input);
+    let table = read_preamble(&mut input)?;
+    Ok((input, table))
+}
+
+fn decode_schema(
+    table: &TableSchema,
+    decimals: Option<&[Option<DataType>]>,
+) -> Result<SchemaRef, String> {
+    let fields = table
+        .columns
+        .iter()
+        .zip(&table.type_ids)
+        .enumerate()
+        .map(|(index, (name, &type_id))| {
+            let dtype = match (decimals, type_id) {
+                (Some(_), 0x06) => DataType::Timestamp(TimeUnit::Millisecond, None),
+                (Some(_), 0x07) => DataType::Date32,
+                (Some(_), 0x08) => DataType::Time32(TimeUnit::Millisecond),
+                (Some(_), 0x09) => DataType::Duration(TimeUnit::Millisecond),
+                (Some(types), DECIMAL) => types[index]
+                    .clone()
+                    .ok_or_else(|| format!("missing Decimal schema for column '{name}'"))?,
+                _ => arrow_type(type_id)?,
+            };
+            Ok(Field::new(name, dtype, true))
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    Ok(Arc::new(Schema::new(fields)))
+}
+
+fn decode_batches(
+    input: &mut BufReader<File>,
+    table_schema: &TableSchema,
+    schema: &SchemaRef,
+    mut write_batch: impl FnMut(&RecordBatch) -> Result<(), String>,
+) -> Result<(usize, usize), String> {
+    let mut rows = 0usize;
+    let mut slices = 0usize;
+    loop {
+        let mut columns = Vec::with_capacity(schema.fields().len());
+        let count = visit_slice(
+            input,
+            table_schema,
+            slices,
+            |_| true,
+            |index, values| {
+                let field = schema.field(index);
+                columns.push(match field.data_type() {
+                    DataType::Timestamp(..)
+                    | DataType::Date32
+                    | DataType::Time32(_)
+                    | DataType::Duration(_) => temporal_array(field, values)?,
+                    DataType::Decimal128(..) | DataType::Decimal256(..) => {
+                        decimal_array(field, values)?
+                    }
+                    _ => values_to_array(field.name(), table_schema.type_ids[index], values)?,
+                });
+                Ok(())
+            },
+        )?;
+        let Some(count) = count else {
+            return Ok((rows, slices));
+        };
+        let batch = RecordBatch::try_new(Arc::clone(schema), columns)
+            .map_err(|error| format!("failed to build SBDF Arrow batch: {error}"))?;
+        write_batch(&batch)?;
+        rows = rows
+            .checked_add(count)
+            .ok_or_else(|| "SBDF row count overflow".to_string())?;
+        slices = slices
+            .checked_add(1)
+            .ok_or_else(|| "SBDF slice count overflow".to_string())?;
+    }
+}
+
+fn visit_slice(
+    input: &mut BufReader<File>,
+    table: &TableSchema,
+    slice: usize,
+    select: impl Fn(usize) -> bool,
+    mut visit: impl FnMut(usize, Vec<Option<ScalarValue>>) -> Result<(), String>,
+) -> Result<Option<usize>, String> {
+    let section = read_section(input)?;
+    if section == TABLE_END {
+        let mut trailing = Vec::new();
+        input
+            .take(17)
+            .read_to_end(&mut trailing)
+            .map_err(|error| error.to_string())?;
+        if trailing.len() > 16
+            || trailing
+                .iter()
+                .any(|byte| !matches!(byte, 0 | b'\t' | b'\n' | b'\r' | b' '))
+        {
+            return Err("unexpected data after SBDF table end".to_string());
+        }
+        return Ok(None);
+    }
+    if section != TABLE_SLICE {
+        return Err(format!(
+            "expected SBDF table slice, found section {section:#04x}"
+        ));
+    }
+    let column_count = read_count(input, "table slice column count")?;
+    if column_count != table.columns.len() {
+        return Err(format!(
+            "SBDF table slice has {column_count} columns; expected {}",
+            table.columns.len()
+        ));
+    }
+    let mut row_count = None;
+    for (index, &type_id) in table.type_ids.iter().enumerate() {
+        if read_section(input)? != COLUMN_SLICE {
+            return Err(format!("expected SBDF column slice {index}"));
+        }
+        let mut array = read_array(input, select(index))?;
+        if array.type_id != type_id {
+            return Err(format!(
+                "SBDF value type differs from metadata for column '{}'",
+                table.columns[index]
+            ));
+        }
+        if row_count
+            .replace(array.count)
+            .is_some_and(|count| count != array.count)
+        {
+            return Err("SBDF column row counts differ".to_string());
+        }
+        for _ in 0..read_count(input, "column property count")? {
+            let name = read_length_prefixed(input, "column property name")?;
+            let markers = read_array(input, name == b"IsInvalid" && array.values.is_some())?;
+            if let (Some(values), Some(markers)) = (&mut array.values, markers.values) {
+                apply_invalids(values, markers, slice as i64)?;
+            }
+        }
+        if let Some(values) = array.values {
+            visit(index, values)?;
+        }
+    }
+    Ok(Some(row_count.unwrap_or(0)))
+}
+
+#[derive(Default)]
+struct DecimalShape {
+    integer_digits: i32,
+    scale: i32,
+}
+
+impl DecimalShape {
+    fn observe(&mut self, coefficient: i128, exponent: i32) {
+        if coefficient != 0 {
+            let digits = coefficient.unsigned_abs().ilog10() as i32 + 1;
+            self.integer_digits = self.integer_digits.max(digits + exponent);
+            self.scale = self.scale.max(-exponent);
+        }
+    }
+
+    fn data_type(&self, column: &str) -> Result<DataType, String> {
+        let precision = (self.integer_digits + self.scale).max(1);
+        match precision {
+            1..=38 => Ok(DataType::Decimal128(precision as u8, self.scale as i8)),
+            39..=76 => Ok(DataType::Decimal256(precision as u8, self.scale as i8)),
+            _ => Err(format!("SBDF Decimal column '{column}' requires precision {precision}; Parquet conversion supports up to 76 digits")),
+        }
+    }
+}
+
+fn infer_decimal_types(
+    input: &mut BufReader<File>,
+    table: &TableSchema,
+) -> Result<Vec<Option<DataType>>, String> {
+    let mut types = vec![None; table.columns.len()];
+    if !table.type_ids.contains(&DECIMAL) {
+        return Ok(types);
+    }
+    let mut shapes = table
+        .type_ids
+        .iter()
+        .map(|&id| (id == DECIMAL).then(DecimalShape::default))
+        .collect::<Vec<_>>();
+    for slice in 0.. {
+        let rows = visit_slice(
+            input,
+            table,
+            slice,
+            |index| table.type_ids[index] == DECIMAL,
+            |index, values| {
+                let Some(shape) = &mut shapes[index] else {
+                    return Ok(());
+                };
+                for value in values.into_iter().flatten() {
+                    let (coefficient, exponent) = decimal_parts(value, &table.columns[index])?;
+                    shape.observe(coefficient, exponent);
+                }
+                Ok(())
+            },
+        )?;
+        if rows.is_none() {
+            break;
+        }
+    }
+    for (index, shape) in shapes.iter().enumerate() {
+        if let Some(shape) = shape {
+            types[index] = Some(shape.data_type(&table.columns[index])?);
+        }
+    }
+    input
+        .seek(SeekFrom::Start(table.preamble_bytes))
+        .map_err(|error| format!("failed to rewind SBDF input: {error}"))?;
+    Ok(types)
+}
+
+fn decimal_parts(value: ScalarValue, column: &str) -> Result<(i128, i32), String> {
+    let ScalarValue::Decimal(bits) = value else {
+        return Err(format!("invalid SBDF Decimal value in column '{column}'"));
+    };
+    // SBDF stores Decimal as little-endian IEEE 754 decimal128 BID.
+    if (bits >> 122) & 0x1f >= 0x1e {
+        return Err(format!(
+            "SBDF Decimal column '{column}' contains NaN or infinity"
+        ));
+    }
+    let mut coefficient = (bits & ((1_u128 << 113) - 1)) as i128;
+    if (bits >> 125) & 3 == 3 || coefficient >= 10_i128.pow(34) || coefficient == 0 {
+        return Ok((0, 0));
+    }
+    let mut exponent = ((bits >> 113) & 0x3fff) as i32 - 6176;
+    while coefficient % 10 == 0 {
+        coefficient /= 10;
+        exponent += 1;
+    }
+    if bits >> 127 != 0 {
+        coefficient = -coefficient;
+    }
+    Ok((coefficient, exponent))
+}
+
+fn decimal_array(field: &Field, values: Vec<Option<ScalarValue>>) -> Result<ArrayRef, String> {
+    let (precision, scale) = match field.data_type() {
+        DataType::Decimal128(precision, scale) | DataType::Decimal256(precision, scale) => {
+            (*precision, *scale)
+        }
+        _ => unreachable!("only Decimal fields are passed to decimal_array"),
+    };
+    let scaled = values.into_iter().map(|value| {
+        let Some(value) = value else {
+            return Ok(None);
+        };
+        let (coefficient, exponent) = decimal_parts(value, field.name())?;
+        let invalid = || {
+            format!(
+                "SBDF Decimal column '{}' no longer matches its inferred schema",
+                field.name()
+            )
+        };
+        let shift = u32::try_from(exponent + i32::from(scale)).map_err(|_| invalid())?;
+        let digits = coefficient
+            .unsigned_abs()
+            .checked_ilog10()
+            .map_or(1, |digits| digits + 1);
+        if coefficient != 0 && digits + shift > u32::from(precision) {
+            return Err(invalid());
+        }
+        let factor = i256::from(10).checked_pow(shift).ok_or_else(invalid)?;
+        i256::from_i128(coefficient)
+            .checked_mul(factor)
+            .map(Some)
+            .ok_or_else(invalid)
+    });
+    let array: ArrayRef = if precision <= 38 {
+        let values = scaled
+            .map(|value| value.map(|value| value.map(i256::as_i128)))
+            .collect::<Result<Vec<_>, String>>()?;
+        Arc::new(
+            Decimal128Array::from(values)
+                .with_precision_and_scale(precision, scale)
+                .map_err(|error| error.to_string())?,
+        )
+    } else {
+        let values = scaled.collect::<Result<Vec<_>, String>>()?;
+        Arc::new(
+            Decimal256Array::from(values)
+                .with_precision_and_scale(precision, scale)
+                .map_err(|error| error.to_string())?,
+        )
+    };
+    Ok(array)
+}
+
+fn temporal_array(field: &Field, values: Vec<Option<ScalarValue>>) -> Result<ArrayRef, String> {
+    use crate::{MILLIS_PER_DAY, UNIX_EPOCH_DAYS_FROM_YEAR_ONE, UNIX_EPOCH_MILLIS_FROM_YEAR_ONE};
+    let invalid = || format!("invalid SBDF temporal value in column '{}'", field.name());
+    let millis = values.into_iter().map(|value| match value {
+        Some(ScalarValue::Int64(value)) => Ok(Some(value)),
+        None => Ok(None),
+        _ => Err(invalid()),
+    });
+    let array: ArrayRef = match field.data_type() {
+        DataType::Timestamp(..) => Arc::new(TimestampMillisecondArray::from(
+            millis
+                .map(|value| {
+                    value?
+                        .map(|value| {
+                            value
+                                .checked_sub(UNIX_EPOCH_MILLIS_FROM_YEAR_ONE)
+                                .ok_or_else(invalid)
+                        })
+                        .transpose()
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )),
+        DataType::Date32 => Arc::new(Date32Array::from(
+            millis
+                .map(|value| {
+                    value?
+                        .map(|value| {
+                            i32::try_from(
+                                value.div_euclid(MILLIS_PER_DAY) - UNIX_EPOCH_DAYS_FROM_YEAR_ONE,
+                            )
+                            .map_err(|_| invalid())
+                        })
+                        .transpose()
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )),
+        DataType::Time32(_) => Arc::new(Time32MillisecondArray::from(
+            millis
+                .map(|value| {
+                    value.map(|value| value.map(|value| value.rem_euclid(MILLIS_PER_DAY) as i32))
+                })
+                .collect::<Result<Vec<_>, _>>()?,
+        )),
+        DataType::Duration(_) => Arc::new(DurationMillisecondArray::from(
+            millis.collect::<Result<Vec<_>, _>>()?,
+        )),
+        _ => unreachable!("only temporal fields are passed to temporal_array"),
+    };
+    Ok(array)
+}
+
 fn apply_invalids(
     values: &mut [Option<ScalarValue>],
     markers: Vec<Option<ScalarValue>>,
@@ -532,6 +1110,7 @@ fn read_array<R: Read>(input: &mut R, decode: bool) -> Result<DecodedArray, Stri
     let count = read_count(input, "array value count")?;
     match encoding {
         PLAIN => Ok(DecodedArray {
+            type_id,
             count,
             values: read_values(input, type_id, count, decode)?,
         }),
@@ -555,7 +1134,11 @@ fn read_array<R: Read>(input: &mut R, decode: bool) -> Result<DecodedArray, Stri
             let values = if let (Some(encoded), Some(lengths)) = (encoded, lengths) {
                 let mut values = Vec::with_capacity(count);
                 for (value, length) in encoded.into_iter().zip(lengths) {
-                    values.extend(std::iter::repeat_n(value, usize::from(length) + 1));
+                    let run_size = usize::from(length) + 1;
+                    if run_size > count - values.len() {
+                        return Err("SBDF RLE decoded row count mismatch".to_string());
+                    }
+                    values.extend(std::iter::repeat_n(value, run_size));
                 }
                 if values.len() != count {
                     return Err("SBDF RLE decoded row count mismatch".to_string());
@@ -564,13 +1147,21 @@ fn read_array<R: Read>(input: &mut R, decode: bool) -> Result<DecodedArray, Stri
             } else {
                 None
             };
-            Ok(DecodedArray { count, values })
+            Ok(DecodedArray {
+                type_id,
+                count,
+                values,
+            })
         }
         BITS => {
+            if type_id != 0x01 {
+                return Err("SBDF bit arrays must have Boolean type".to_string());
+            }
             let byte_count = count.div_ceil(8);
             if !decode {
                 discard_exact(input, byte_count, "bit array")?;
                 return Ok(DecodedArray {
+                    type_id,
                     count,
                     values: None,
                 });
@@ -586,6 +1177,7 @@ fn read_array<R: Read>(input: &mut R, decode: bool) -> Result<DecodedArray, Stri
                 })
                 .collect();
             Ok(DecodedArray {
+                type_id,
                 count,
                 values: Some(values),
             })
@@ -665,6 +1257,9 @@ fn primitive_scalar(type_id: u8, bytes: &[u8]) -> Result<ScalarValue, String> {
         0x05 => Ok(ScalarValue::Float64(f64::from_le_bytes(
             bytes.try_into().unwrap(),
         ))),
+        DECIMAL => Ok(ScalarValue::Decimal(u128::from_le_bytes(
+            bytes.try_into().unwrap(),
+        ))),
         other => Err(format!("unsupported SBDF primitive type {other:#04x}")),
     }
 }
@@ -686,8 +1281,14 @@ fn read_preamble<R: Read + Seek>(input: &mut R) -> Result<TableSchema, String> {
     if read_section(input)? != TABLE_METADATA {
         return Err("SBDF file header is not followed by table metadata".to_string());
     }
-    if read_count(input, "table property count")? != 0 {
-        return Err("SBDF table properties are not supported by the sidecar indexer".to_string());
+    for _ in 0..read_count(input, "table property count")? {
+        let _ = read_length_prefixed(input, "table property name")?;
+        let type_id = read_u8(input, "table property type")?;
+        for _ in 0..2 {
+            if read_u8(input, "table property value marker")? != 0 {
+                read_metadata_value(input, type_id, false)?;
+            }
+        }
     }
     let column_count = read_count(input, "metadata column count")?;
     let definition_count = read_count(input, "metadata definition count")?;
@@ -695,24 +1296,32 @@ fn read_preamble<R: Read + Seek>(input: &mut R) -> Result<TableSchema, String> {
     for _ in 0..definition_count {
         let name = read_length_prefixed(input, "metadata definition name")?;
         let type_id = read_u8(input, "metadata definition type")?;
-        if read_u8(input, "metadata definition default marker")? != 0 {
-            return Err("metadata definition defaults are not supported".to_string());
-        }
-        definitions.push((name, type_id));
+        let is_schema_field =
+            (name == b"Name" && type_id == 0x0a) || (name == b"DataType" && type_id == 0x0c);
+        let default = if read_u8(input, "metadata definition default marker")? != 0 {
+            read_metadata_value(input, type_id, is_schema_field)?
+        } else {
+            None
+        };
+        definitions.push((name, type_id, is_schema_field, default));
     }
     let mut columns = Vec::with_capacity(column_count);
     let mut type_ids = Vec::with_capacity(column_count);
     for _ in 0..column_count {
         let mut column_name = None;
         let mut column_type = None;
-        for (name, type_id) in &definitions {
-            if read_u8(input, "metadata value marker")? == 0 {
+        for (name, type_id, is_schema_field, default) in &definitions {
+            let explicit = if read_u8(input, "metadata value marker")? != 0 {
+                read_metadata_value(input, *type_id, *is_schema_field)?
+            } else {
+                None
+            };
+            let Some(value) = explicit.as_ref().or(default.as_ref()) else {
                 continue;
-            }
-            let value = read_length_prefixed(input, "metadata value")?;
+            };
             if name == b"Name" && *type_id == 0x0a {
                 column_name = Some(
-                    String::from_utf8(value)
+                    String::from_utf8(value.clone())
                         .map_err(|error| format!("SBDF column name is not UTF-8: {error}"))?,
                 );
             } else if name == b"DataType" && *type_id == 0x0c {
@@ -734,6 +1343,22 @@ fn read_preamble<R: Read + Seek>(input: &mut R) -> Result<TableSchema, String> {
         type_ids,
         preamble_bytes,
     })
+}
+
+fn read_metadata_value<R: Read>(
+    input: &mut R,
+    type_id: u8,
+    keep: bool,
+) -> Result<Option<Vec<u8>>, String> {
+    if keep {
+        return read_length_prefixed(input, "column metadata value").map(Some);
+    }
+    let width = match type_id {
+        0x0a | 0x0c => read_count(input, "metadata value length")?,
+        _ => primitive_width(type_id)?,
+    };
+    discard_exact(input, width, "metadata value")?;
+    Ok(None)
 }
 
 fn read_section<R: Read>(input: &mut R) -> Result<u8, String> {
@@ -801,6 +1426,7 @@ fn primitive_width(type_id: u8) -> Result<usize, String> {
         0x01 => Ok(1),
         0x02 | 0x04 => Ok(4),
         0x03 | 0x05..=0x09 => Ok(8),
+        DECIMAL => Ok(16),
         other => Err(format!("unsupported SBDF type {other:#04x}")),
     }
 }
@@ -884,14 +1510,64 @@ fn publish_partial(partial: &Path, target: &Path) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{generate_sidecar, BYTE_LENGTH_COLUMN, BYTE_OFFSET_COLUMN, SLICE_ID_COLUMN};
+    use super::{
+        decode_to_ipc, generate_sidecar, plan_ranges_json, BYTE_LENGTH_COLUMN, BYTE_OFFSET_COLUMN,
+        SLICE_ID_COLUMN,
+    };
     use crate::rust_sbdf::{self, EncodingStrategy, ValueView};
     use arrow_array::{Array, Int64Array, StringArray};
+    use arrow_ipc::reader::FileReader;
     use parquet::arrow::arrow_reader::ParquetRecordBatchReaderBuilder;
     use std::ffi::c_int;
     use std::fs::{self, File};
     use std::path::Path;
     use std::sync::atomic::Ordering;
+
+    #[test]
+    fn range_plan_deduplicates_slices_and_preserves_format_boundaries() {
+        let document = plan_ranges_json(
+            r#"{
+                "preamble_bytes": 100,
+                "end_marker_offset": 1000,
+                "file_size": 1003,
+                "slices": [
+                    {"slice_id": 2, "byte_offset": 400, "byte_length": 100},
+                    {"slice_id": 1, "byte_offset": 100, "byte_length": 200},
+                    {"slice_id": 1, "byte_offset": 100, "byte_length": 200}
+                ],
+                "merge_gap_bytes": 100,
+                "max_range_bytes": 600
+            }"#,
+        )
+        .unwrap();
+        let value: serde_json::Value = serde_json::from_str(&document).unwrap();
+        assert_eq!(value["requested_slice_count"], 2);
+        assert_eq!(value["logical_ranges"][0]["role"], "preamble");
+        assert_eq!(value["logical_ranges"][3]["role"], "end_marker");
+        assert_eq!(value["fetch_ranges"].as_array().unwrap().len(), 2);
+    }
+
+    #[test]
+    fn range_plan_rejects_conflicting_or_overlapping_coordinates() {
+        let conflict = r#"{
+            "preamble_bytes": 10, "end_marker_offset": 100, "file_size": 103,
+            "slices": [
+                {"slice_id": 1, "byte_offset": 10, "byte_length": 20},
+                {"slice_id": 1, "byte_offset": 11, "byte_length": 20}
+            ]
+        }"#;
+        assert!(plan_ranges_json(conflict)
+            .unwrap_err()
+            .contains("conflicting"));
+        let overlap = r#"{
+            "preamble_bytes": 10, "end_marker_offset": 100, "file_size": 103,
+            "slices": [
+                {"slice_id": 1, "byte_offset": 10, "byte_length": 30},
+                {"slice_id": 2, "byte_offset": 20, "byte_length": 30}
+            ]
+        }"#;
+        assert!(plan_ranges_json(overlap).unwrap_err().contains("overlap"));
+    }
 
     fn primitive_i64(values: &[i64]) -> ValueView<'_> {
         let bytes = unsafe {
@@ -1037,5 +1713,101 @@ mod tests {
         }
         assert_eq!(&fs::read(&sidecar_path).unwrap()[..4], b"PAR1");
         let _ = fs::remove_dir_all(Path::new(&root));
+    }
+
+    #[test]
+    fn decoder_round_trips_rle_values_and_invalid_markers_to_ipc() {
+        let sequence = crate::WORKSPACE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "smoking-sbdf-decode-test-{}-{sequence}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let sbdf_path = root.join("events.sbdf");
+        let ipc_path = root.join("events.arrow");
+        let mut sbdf = Vec::new();
+        rust_sbdf::write_preamble(
+            &mut sbdf,
+            &["device_key".to_string(), "event_id".to_string()],
+            &[0x0a, 0x03],
+        )
+        .unwrap();
+        append_slice(&mut sbdf, &["A", "B"], &[1, 2], None);
+        append_slice(&mut sbdf, &[""], &[3], Some(&[1]));
+        rust_sbdf::write_end_marker(&mut sbdf).unwrap();
+        fs::write(&sbdf_path, sbdf).unwrap();
+
+        assert_eq!(decode_to_ipc(&sbdf_path, &ipc_path).unwrap(), (3, 2));
+        let reader = FileReader::try_new(File::open(&ipc_path).unwrap(), None).unwrap();
+        let batches = reader.collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(
+            batches.iter().map(|batch| batch.num_rows()).sum::<usize>(),
+            3
+        );
+        let devices = batches[1]
+            .column_by_name("device_key")
+            .unwrap()
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert!(devices.is_null(0));
+    }
+
+    #[test]
+    fn decoder_preserves_duplicate_logical_keys_across_slices() {
+        let sequence = crate::WORKSPACE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "smoking-sbdf-duplicate-test-{}-{sequence}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let sbdf_path = root.join("events.sbdf");
+        let ipc_path = root.join("events.arrow");
+        let mut sbdf = Vec::new();
+        rust_sbdf::write_preamble(
+            &mut sbdf,
+            &["device_key".to_string(), "event_id".to_string()],
+            &[0x0a, 0x03],
+        )
+        .unwrap();
+        append_slice(&mut sbdf, &["A"], &[1], None);
+        append_slice(&mut sbdf, &["A"], &[1], None);
+        rust_sbdf::write_end_marker(&mut sbdf).unwrap();
+        fs::write(&sbdf_path, sbdf).unwrap();
+
+        assert_eq!(decode_to_ipc(&sbdf_path, &ipc_path).unwrap(), (2, 2));
+        let reader = FileReader::try_new(File::open(&ipc_path).unwrap(), None).unwrap();
+        assert_eq!(reader.into_iter().count(), 2);
+    }
+
+    #[test]
+    fn decoder_rejects_truncated_and_corrupt_streams_atomically() {
+        let sequence = crate::WORKSPACE_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let root = std::env::temp_dir().join(format!(
+            "smoking-sbdf-corrupt-test-{}-{sequence}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&root).unwrap();
+        let sbdf_path = root.join("events.sbdf");
+        let output_path = root.join("events.arrow");
+        let mut sbdf = Vec::new();
+        rust_sbdf::write_preamble(
+            &mut sbdf,
+            &["device_key".to_string(), "event_id".to_string()],
+            &[0x0a, 0x03],
+        )
+        .unwrap();
+        append_slice(&mut sbdf, &["A"], &[1], None);
+        rust_sbdf::write_end_marker(&mut sbdf).unwrap();
+        sbdf.pop();
+        fs::write(&sbdf_path, &sbdf).unwrap();
+        assert!(decode_to_ipc(&sbdf_path, &output_path).is_err());
+        assert!(!output_path.exists());
+
+        let mut corrupt = sbdf;
+        corrupt.extend_from_slice(&[0xdf, 0x5b, 0x7f]);
+        fs::write(&sbdf_path, corrupt).unwrap();
+        assert!(decode_to_ipc(&sbdf_path, &output_path).is_err());
+        assert!(!output_path.exists());
     }
 }

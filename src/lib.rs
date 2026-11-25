@@ -4342,6 +4342,34 @@ fn generate_sbdf_sidecar(
     .map_err(PyRuntimeError::new_err)
 }
 
+#[pyfunction]
+fn plan_sbdf_ranges(request_json: String) -> PyResult<String> {
+    sbdf_index::plan_ranges_json(&request_json).map_err(PyValueError::new_err)
+}
+
+#[pyfunction]
+fn decode_sbdf_to_ipc(sbdf_path: String, output_path: String) -> PyResult<String> {
+    let (rows, slices) = sbdf_index::decode_to_ipc(Path::new(&sbdf_path), Path::new(&output_path))
+        .map_err(PyRuntimeError::new_err)?;
+    serde_json::to_string(&serde_json::json!({
+        "schema_version": "smoking-sbdf.decode-ipc.v1",
+        "rows": rows,
+        "slices": slices,
+        "output_ipc_path": output_path,
+    }))
+    .map_err(|error| PyRuntimeError::new_err(error.to_string()))
+}
+
+#[pyfunction]
+fn sbdf_to_parquet_streaming(
+    py: Python<'_>,
+    sbdf_path: String,
+    output_path: String,
+) -> PyResult<()> {
+    py.detach(|| sbdf_index::decode_to_parquet(Path::new(&sbdf_path), Path::new(&output_path)))
+        .map_err(PyRuntimeError::new_err)
+}
+
 #[pyclass(unsendable)]
 struct StreamingSbdfWriter {
     output: Option<BufWriter<File>>,
@@ -4650,7 +4678,7 @@ impl Drop for StreamingSbdfWriter {
 
 #[pymodule]
 fn _native(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
-    module.add("__doc__", "Rust-backed streaming SBDF writer")?;
+    module.add("__doc__", "Rust-backed streaming SBDF reader and writer")?;
     module.add("SBDFError", _py.get_type::<PyRuntimeError>())?;
     module.add_class::<StreamingSbdfWriter>()?;
     module.add_function(wrap_pyfunction!(parquet_to_sbdf_streaming, module)?)?;
@@ -4658,6 +4686,9 @@ fn _native(_py: Python<'_>, module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(csv_to_sbdf_streaming, module)?)?;
     module.add_function(wrap_pyfunction!(resolve_dataframe_column_types, module)?)?;
     module.add_function(wrap_pyfunction!(generate_sbdf_sidecar, module)?)?;
+    module.add_function(wrap_pyfunction!(plan_sbdf_ranges, module)?)?;
+    module.add_function(wrap_pyfunction!(decode_sbdf_to_ipc, module)?)?;
+    module.add_function(wrap_pyfunction!(sbdf_to_parquet_streaming, module)?)?;
     Ok(())
 }
 

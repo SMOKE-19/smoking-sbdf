@@ -8,13 +8,13 @@ from pathlib import Path
 import sys
 from typing import Sequence
 
-from . import SBDFError, convert
+from . import SBDFError, convert, sbdf_to_parquet_streaming
 
 
 PROJECT_README = """# SBDF 변환 안내
 
 이 프로젝트는 `smoking-sbdf`로 CSV, Parquet 또는 Python DataFrame을
-Spotfire SBDF 1.0 파일로 변환한다.
+Spotfire SBDF 1.0 파일로 변환하고, SBDF를 Parquet로 변환한다.
 
 ## CLI
 
@@ -23,6 +23,7 @@ smoking-sbdf convert input.csv output.sbdf
 smoking-sbdf convert input.parquet output.sbdf
 smoking-sbdf convert input.csv output.sbdf --workers 4
 smoking-sbdf convert input.parquet output.sbdf --workers 3
+smoking-sbdf to-parquet input.sbdf output.parquet
 smoking-sbdf -help
 ```
 
@@ -58,7 +59,8 @@ dataframe.to_sbdf("output.sbdf")
 
 - 입력 파일을 변경하거나 삭제하지 않는다.
 - 출력 경로는 입력 경로와 다르게 지정한다.
-- CSV, Parquet, Parquet dataset과 manifest만 CLI 입력으로 사용한다.
+- `convert`에는 CSV, Parquet, Parquet dataset 또는 manifest를 넣는다.
+- `to-parquet`에는 SBDF 파일 하나를 넣는다.
 - `--workers`는 1–8이며 CSV 기본값은 1, Parquet 기본 최대값은 3이다.
 - Parquet worker 수를 강제하려면 `--no-adaptive-workers`를 함께 사용한다.
 - row-key Parquet sidecar가 필요하면 Python API의 `row_key_columns`를 사용한다.
@@ -127,10 +129,11 @@ def _write_project_readme(directory: Path, *, force: bool) -> Path:
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="smoking-sbdf",
-        description="Convert CSV, Parquet, and dataset inputs to SBDF.",
+        description="Convert files to SBDF or convert SBDF to Parquet.",
         epilog=(
             "LLM entrypoints: 'smoking-sbdf -help', "
-            "'smoking-sbdf convert -help', and 'smoking-sbdf init -help'."
+            "'smoking-sbdf convert -help', 'smoking-sbdf to-parquet -help', "
+            "and 'smoking-sbdf init -help'."
         ),
         add_help=False,
     )
@@ -194,6 +197,16 @@ def _parser() -> argparse.ArgumentParser:
     dataset_options = convert_parser.add_argument_group("Parquet dataset options")
     dataset_options.add_argument("--recursive", action="store_true")
 
+    parquet_parser = commands.add_parser(
+        "to-parquet",
+        help="convert an SBDF file into a Parquet file",
+        epilog="Example: smoking-sbdf to-parquet input.sbdf output.parquet",
+        add_help=False,
+    )
+    _add_help_argument(parquet_parser)
+    parquet_parser.add_argument("input", type=Path, help="input SBDF 1.0 file")
+    parquet_parser.add_argument("output", type=Path, help="output Parquet file")
+
     init_parser = commands.add_parser(
         "init",
         help="create an LLM-friendly README.md",
@@ -224,6 +237,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 arguments.directory,
                 force=arguments.force,
             )
+        elif arguments.command == "to-parquet":
+            output = sbdf_to_parquet_streaming(arguments.input, arguments.output)
         else:
             column_types = _column_types(arguments.column_type)
             output = convert(

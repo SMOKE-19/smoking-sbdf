@@ -1,7 +1,7 @@
 THIRD-PARTY RUST DEPENDENCY LICENSES
 ====================================
 
-Generated from the Cargo.lock used for the v0.1.6 release. This file is a
+Based on the Cargo.lock used for the v0.1.7 release. This file is a
 static license snapshot for the published source and binary artifacts.
 
 PACKAGE INVENTORY
@@ -499,6 +499,12 @@ seq-macro 0.3.6
   Upstream: https://github.com/dtolnay/seq-macro
   License document IDs: 85ad950cce87, 30fefc3a7d6a
 
+serde 1.0.229
+  License expression: MIT OR Apache-2.0
+  Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
+  Upstream: https://github.com/serde-rs/serde
+  License document IDs: 85ad950cce87, 30fefc3a7d6a
+
 serde_core 1.0.229
   License expression: MIT OR Apache-2.0
   Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
@@ -509,6 +515,12 @@ serde_derive 1.0.229
   License expression: MIT OR Apache-2.0
   Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
   Upstream: https://github.com/serde-rs/serde
+  License document IDs: 85ad950cce87, 30fefc3a7d6a
+
+serde_json 1.0.151
+  License expression: MIT OR Apache-2.0
+  Authors: Erick Tryzelaar <erick.tryzelaar@gmail.com>; David Tolnay <dtolnay@gmail.com>
+  Upstream: https://github.com/serde-rs/json
   License document IDs: 85ad950cce87, 30fefc3a7d6a
 
 shlex 1.3.0
@@ -672,6 +684,12 @@ zlib-rs 0.6.3
   Authors: not declared
   Upstream: https://github.com/trifectatechfoundation/zlib-rs
   License document IDs: 6ddf0fba55d4
+
+zmij 1.0.23
+  License expression: MIT
+  Authors: David Tolnay <dtolnay@gmail.com>
+  Upstream: https://github.com/dtolnay/zmij
+  License document IDs: 30fefc3a7d6a
 
 zstd 0.13.3
   License expression: MIT
@@ -1657,13 +1675,16 @@ Applies to:
   - rustversion 1.0.22 (LICENSE-MIT)
   - semver 1.0.27 (LICENSE-MIT)
   - seq-macro 0.3.6 (LICENSE-MIT)
+  - serde 1.0.229 (LICENSE-MIT)
   - serde_core 1.0.229 (LICENSE-MIT)
   - serde_derive 1.0.229 (LICENSE-MIT)
+  - serde_json 1.0.151 (LICENSE-MIT)
   - syn 2.0.117 (LICENSE-MIT)
   - syn 3.0.3 (LICENSE-MIT)
   - unicode-ident 1.0.24 (LICENSE-MIT)
   - wasi 0.11.1+wasi-snapshot-preview1 (LICENSE-MIT)
   - wit-bindgen 0.51.0 (LICENSE-MIT)
+  - zmij 1.0.23 (LICENSE-MIT)
 
 Permission is hereby granted, free of charge, to any
 person obtaining a copy of this software and associated
@@ -3397,8 +3418,10 @@ Applies to:
   - ryu 1.0.23 (LICENSE-APACHE)
   - semver 1.0.27 (LICENSE-APACHE)
   - seq-macro 0.3.6 (LICENSE-APACHE)
+  - serde 1.0.229 (LICENSE-APACHE)
   - serde_core 1.0.229 (LICENSE-APACHE)
   - serde_derive 1.0.229 (LICENSE-APACHE)
+  - serde_json 1.0.151 (LICENSE-APACHE)
   - syn 2.0.117 (LICENSE-APACHE)
   - syn 3.0.3 (LICENSE-APACHE)
   - unicode-ident 1.0.24 (LICENSE-APACHE)

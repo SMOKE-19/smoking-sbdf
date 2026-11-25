@@ -4,8 +4,8 @@ build-backend = "maturin"
 
 [project]
 name = "smoking-sbdf"
-version = "0.1.6"
-description = "Rust-backed streaming conversion from CSV, Parquet, and DataFrames to Spotfire SBDF"
+version = "0.1.7"
+description = "Rust-backed streaming conversion between Spotfire SBDF and Parquet"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "BSD-3-Clause"

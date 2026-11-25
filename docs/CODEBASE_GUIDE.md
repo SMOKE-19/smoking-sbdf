@@ -7,7 +7,7 @@
 ## 프로젝트 한 문장 요약
 
 `smoking-sbdf`는 Python에서 CSV, Parquet와 DataFrame을 받아 Rust로 Spotfire SBDF
-1.0 파일을 기록하는 로컬 변환 패키지다. 선택적으로 row key와 SBDF slice byte
+1.0 파일을 기록하고, SBDF를 Parquet로 읽는 로컬 변환 패키지다. 선택적으로 row key와 SBDF slice byte
 범위를 연결하는 Parquet sidecar도 만든다.
 
 ## 기술 스택과 경계
@@ -24,7 +24,7 @@ PyO3 native module
 src/lib.rs
         │  Arrow/CSV decode, worker 계획, bounded batch, 통계 집계
         ├──────────────► src/rust_sbdf.rs ──► SBDF 파일
-        └──────────────► src/sbdf_index.rs ─► Parquet sidecar
+        └──────────────► src/sbdf_index.rs ─► Parquet·Arrow IPC·Parquet sidecar
 ```
 
 - Python은 사용하기 쉬운 API와 경로 처리를 담당한다.
@@ -41,7 +41,7 @@ src/lib.rs
 | 3 | `src/smoking_sbdf/__init__.py` | Python 공개 API와 형식 dispatch |
 | 4 | `src/lib.rs` | Rust/PyO3 진입점과 전체 변환 orchestration |
 | 5 | `src/rust_sbdf.rs` | SBDF preamble, slice, column encoding과 end marker |
-| 6 | `src/sbdf_index.rs` | 완성된 SBDF를 읽어 Parquet sidecar 생성 |
+| 6 | `src/sbdf_index.rs` | SBDF 디코딩, Parquet 출력과 sidecar 생성 |
 
 CSV 병렬 경계를 수정할 때는 `src/csv_spans.rs`와 `src/native_csv.rs`를 추가로 읽는다.
 컬럼 타입 자동 규칙을 수정할 때는 `src/type_rules/mod.rs`를 읽는다.
@@ -63,9 +63,10 @@ CSV 병렬 경계를 수정할 때는 `src/csv_spans.rs`와 `src/native_csv.rs`�
 ### `src/smoking_sbdf/cli.py`
 
 - `smoking-sbdf convert`
+- `smoking-sbdf to-parquet`
 - `smoking-sbdf init`
 - `-h`, `--help`, `-help`
-- CLI 값을 Python `convert()`에 전달
+- CLI 값을 Python `convert()` 또는 `sbdf_to_parquet_streaming()`에 전달
 
 CLI는 현재 sidecar 옵션과 구조화된 결과 출력을 제공하지 않는다. 이 기능이 필요하면
 Python API를 사용한다.
@@ -112,7 +113,10 @@ schema는 Arrow CSV decoder가 더 빠를 수 있어 현재 컬럼 수에 따라
 
 ### `src/sbdf_index.rs`
 
-완성된 SBDF를 순차로 읽고 지정된 row-key 컬럼만 decode한다. 각 SBDF table slice마다
+본문 변환은 SBDF 슬라이스를 Arrow 배치로 만들어 Parquet 또는 Arrow IPC에 스트리밍한다.
+Parquet 경로는 날짜와 시간의 SBDF 저장값을 논리 타입으로 변환한다.
+
+sidecar는 지정된 row-key 컬럼만 decode한다. 각 SBDF table slice마다
 Parquet row group 하나를 기록하며 다음 정보를 보존한다.
 
 - table ID와 SBDF 파일명
@@ -135,6 +139,7 @@ sidecar는 조회 인덱스이지 SBDF 본문을 대신하지 않는다.
 - `parquet_manifest_to_sbdf_streaming(...) -> Path`
 - `dataframe_to_sbdf(...) -> Path`
 - `generate_sbdf_sidecar(...) -> Path`
+- `sbdf_to_parquet_streaming(...) -> Path`
 
 기존 `Path` 반환 함수를 구조화된 결과로 직접 바꾸지 않는다. 상위 런타임이 실행
 통계를 필요로 하면 `convert_with_result()`를 사용한다.
